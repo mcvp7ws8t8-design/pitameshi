@@ -16,6 +16,8 @@
     }
   ],
   // 秘密情報は vars に書かず `npx wrangler secret put HOTPEPPER_API_KEY` などで登録する。
+  // SITE_URL は実行時用。静的に作るページ(トップ・サイトマップ・robots.txt)はビルド時の SITE_URL を使うので、
+  // 公開時は GitHub Variables の SITE_URL にも同じ値を入れる(.github/workflows/ci.yml)。
   "vars": {
     "SITE_URL": "https://example.com"
   },

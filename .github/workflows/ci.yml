@@ -1,6 +1,8 @@
 # テスト・型チェック・ビルドを毎回実行し、main に入ったら Cloudflare に公開する
 # 公開に必要な GitHub Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
 # (HOTPEPPER_API_KEY などの秘密情報は `npx wrangler secret put` で Cloudflare 側に登録しておく)
+# 公開に必要な GitHub Variables: SITE_URL(例 https://pitameshi.example)
+#   トップ・サイトマップ・robots.txt・canonical はビルド時に静的に作られるため、ビルド時に必要。
 name: CI
 
 on:
@@ -16,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -30,8 +32,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
+      - name: SITE_URL が設定されているか確認
+        run: |
+          if [ -z "$SITE_URL" ]; then echo "::error::GitHub Variables に SITE_URL を設定してください"; exit 1; fi
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
       - run: npm run deploy
         env:
+          SITE_URL: ${{ vars.SITE_URL }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

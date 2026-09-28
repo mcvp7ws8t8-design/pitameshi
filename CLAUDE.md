@@ -38,4 +38,4 @@
 F-xx 機能 / S-xx 絞り込み強化 / C-xx カフェ / U-xx 使いやすさ。コメントにIDを書いてあるので、要件との対応はIDで検索できる。
 
 ## まだ確認できていないこと(最初にやる)
-`docs/status.md` を参照。この雛形は npm が使えない環境で書いたため、`npm install` 後の初回ビルドで出るエラーを直すところから始める。
+`docs/status.md` を参照。`npm install` → build → Workers の preview までは確認済み。次はホットペッパーAPIの実データでの確認と、Cloudflare・Supabase の準備。
