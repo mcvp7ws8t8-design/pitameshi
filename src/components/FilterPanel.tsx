@@ -93,8 +93,13 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
   const [showAll, setShowAll] = useState(false);
   const [draft, setDraft] = useState<SearchState>(state);
 
-  // URLが変わったら(チップで条件を外したときなど)下書きもそろえる
-  useEffect(() => setDraft(state), [state]);
+  // URLが変わったら(チップで条件を外したときなど)下書きもそろえる。
+  // effect で setState すると描画が2回走るので、レンダー中に前回の state と比べてそろえる。
+  const [syncedState, setSyncedState] = useState(state);
+  if (syncedState !== state) {
+    setSyncedState(state);
+    setDraft(state);
+  }
   useEffect(() => {
     document.body.dataset.sheetOpen = open ? "true" : "false";
     return () => {

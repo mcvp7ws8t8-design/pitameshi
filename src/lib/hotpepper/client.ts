@@ -1,5 +1,6 @@
 import {
   HotpepperApiError,
+  type HotpepperApiErrorBody,
   type HotpepperBackend,
   type HotpepperMasterResponse,
   type HotpepperPage,
@@ -49,12 +50,15 @@ function toNumber(value: number | string | undefined, fallback = 0): number {
  * エラー時もHTTPステータスは200で返る(API仕様)ので、中身で判定する。
  * 1000: サーバ障害 / 2000: APIキーまたはIP認証 / 3000: パラメータ不正
  */
+function throwIfApiError(error: HotpepperApiErrorBody | undefined) {
+  if (!error) return;
+  const err = Array.isArray(error) ? error[0] : error;
+  throw new HotpepperApiError(err?.message ?? "API error", String(err?.code ?? "unknown"));
+}
+
 export function parseSearchResponse(json: HotpepperSearchResponse): HotpepperPage {
   const results = json.results;
-  if (results.error) {
-    const err = Array.isArray(results.error) ? results.error[0] : results.error;
-    throw new HotpepperApiError(err?.message ?? "API error", String(err?.code ?? "unknown"));
-  }
+  throwIfApiError(results.error);
   return {
     total: toNumber(results.results_available),
     start: toNumber(results.results_start, 1),
@@ -88,5 +92,7 @@ export async function fetchMaster<K extends string>(
   const res = await fetchImpl(url, { next: { revalidate: CACHE_SECONDS } });
   if (!res.ok) throw new HotpepperApiError(`HTTP ${res.status}`, `http_${res.status}`);
   const json = (await res.json()) as HotpepperMasterResponse<K>;
+  // エラーもHTTP 200で返る。空の配列にすると画面の選択肢が消えるので、投げて予備の値を使わせる
+  throwIfApiError(json.results.error);
   return json.results[key] ?? [];
 }

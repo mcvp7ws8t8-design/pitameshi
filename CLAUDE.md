@@ -11,7 +11,7 @@
 
 ## コマンド
 - `npm run dev` 開発サーバー(APIキー未設定なら仮データで動く)
-- `npm test` / `npm run typecheck` / `npm run build`
+- `npm test` / `npm run lint` / `npm run typecheck` / `npm run build`
 - `npm run preview` Workers の実行環境で確認 / `npm run deploy` 公開
 
 ## 守ること(規約・要件。変更するときはユーザーに確認)
@@ -38,4 +38,4 @@
 F-xx 機能 / S-xx 絞り込み強化 / C-xx カフェ / U-xx 使いやすさ。コメントにIDを書いてあるので、要件との対応はIDで検索できる。
 
 ## まだ確認できていないこと(最初にやる)
-`docs/status.md` を参照。この雛形は npm が使えない環境で書いたため、`npm install` 後の初回ビルドで出るエラーを直すところから始める。
+`docs/status.md` を参照。ビルド・Workers での表示確認までは済み。次は正しいホットペッパーAPIキーでの実データ確認。

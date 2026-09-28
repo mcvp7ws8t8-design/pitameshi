@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildQueryString, CACHE_SECONDS, createApiBackend, parseSearchResponse } from "./client";
+import { buildQueryString, CACHE_SECONDS, createApiBackend, fetchMaster, parseSearchResponse } from "./client";
 import { HotpepperApiError } from "./types";
 
 test("キャッシュは規約どおり24時間以内", () => {
@@ -36,4 +36,10 @@ test("APIバックエンドは revalidate を付けて呼ぶ", async () => {
   assert.equal(page.shops[0]?.id, "J1");
   assert.ok(seenUrl.startsWith("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/?"));
   assert.equal(seenRevalidate, CACHE_SECONDS);
+});
+
+test("マスタAPIのエラーは空の配列にせず投げる(予備の値を使わせるため)", async () => {
+  const fakeFetch = async () =>
+    new Response(JSON.stringify({ results: { api_version: "1.30", error: [{ code: 2000, message: "APIキーが正しくありません" }] } }));
+  await assert.rejects(fetchMaster("k", "genre", "genre", {}, fakeFetch), HotpepperApiError);
 });

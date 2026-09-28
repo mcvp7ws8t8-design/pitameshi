@@ -75,9 +75,12 @@ export type HotpepperSearchResponse = {
     results_returned: number | string;
     results_start: number | string;
     shop?: HotpepperShop[];
-    error?: { message: string; code: number | string }[] | { message: string; code: number | string };
+    error?: HotpepperApiErrorBody;
   };
 };
+
+/** エラー時の results.error(配列のときと1件のときがある) */
+export type HotpepperApiErrorBody = { message: string; code: number | string }[] | { message: string; code: number | string };
 
 export type HotpepperMasterResponse<K extends string> = {
   results: {
@@ -85,6 +88,7 @@ export type HotpepperMasterResponse<K extends string> = {
     results_available: number | string;
     results_returned: number | string;
     results_start: number | string;
+    error?: HotpepperApiErrorBody;
   } & { [key in K]?: (CodeName & Record<string, unknown>)[] };
 };
 
