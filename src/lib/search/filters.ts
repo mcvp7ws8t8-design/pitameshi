@@ -102,7 +102,7 @@ export const ALCOHOL_OPTIONS = [
 ] as const;
 export type AlcoholId = (typeof ALCOHOL_OPTIONS)[number]["id"];
 
-/** タバコ(S-03)。店舗データの「禁煙席」の記載から判定する(src/lib/search/smoking.ts)。 */
+/** タバコ(S-03)。店舗データの「禁煙席」の記載から判定する(src/lib/search/interpret.ts)。 */
 export const SMOKING_OPTIONS = [
   { id: "ok", label: "喫煙できる(分煙を含む)", help: "店内のどこかでタバコを吸えるお店です。喫煙できる席・部屋には20歳未満は入れません。" },
   { id: "separated", label: "分煙", help: "禁煙の席と、喫煙できる席(または喫煙室)が分かれているお店です。" },
