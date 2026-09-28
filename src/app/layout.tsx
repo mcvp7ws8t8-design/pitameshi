@@ -38,6 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/cafes" className="hover:text-brand">
                 カフェ
               </Link>
+              <Link href="/favorites" className="hover:text-brand">
+                お気に入り
+              </Link>
             </nav>
           </div>
         </header>

@@ -74,3 +74,12 @@ export async function getShop(id: string): Promise<HotpepperShop | undefined> {
   const page = await getBackend().search({ id });
   return page.shops[0];
 }
+
+/** 複数の店舗をまとめて取得する(お気に入り用。API仕様で20件まで)。渡した順に並べて返す。 */
+export async function getShops(ids: string[]): Promise<HotpepperShop[]> {
+  const valid = ids.filter((id) => SHOP_ID_RE.test(id)).slice(0, 20);
+  if (valid.length === 0) return [];
+  const page = await getBackend().search({ id: valid, count: String(valid.length) });
+  const byId = new Map(page.shops.map((s) => [s.id, s]));
+  return valid.map((id) => byId.get(id)).filter((s): s is HotpepperShop => Boolean(s));
+}

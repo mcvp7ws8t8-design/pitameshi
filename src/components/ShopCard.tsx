@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ShopView } from "@/lib/search/engine";
+import { FavoriteButton } from "./Favorites";
 
 const TONE: Record<string, string> = {
   good: "bg-brand-soft text-brand-strong",
@@ -49,7 +50,8 @@ export function ShopCard({ view, from }: { view: ShopView; from: string }) {
             </li>
           ))}
         </ul>
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex items-center justify-end gap-2">
+          <FavoriteButton shopId={shop.id} />
           <a
             href={`/go/${shop.id}?from=${encodeURIComponent(from)}`}
             rel="nofollow sponsored"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrNotice } from "@/components/Credits";
+import { FavoriteButton } from "@/components/Favorites";
 import { getShop } from "@/lib/hotpepper";
 import { shopBadges } from "@/lib/search/badges";
 import { classifySmoking, SMOKING_LABEL, shopLatLng, yesNo } from "@/lib/search/interpret";
@@ -64,7 +65,10 @@ export default async function ShopPage({ params }: Props) {
           <p className="text-sm text-ink-soft">
             {shop.genre.name} ・ {shop.small_area?.name ?? shop.middle_area?.name}
           </p>
-          <h1 className="text-2xl font-bold leading-snug">{shop.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-bold leading-snug">{shop.name}</h1>
+            <FavoriteButton shopId={shop.id} className="shrink-0" />
+          </div>
           <p className="text-ink-soft">{shop.catch}</p>
           <p className="font-semibold">{shop.budget?.average || shop.budget?.name}</p>
           <ul className="flex flex-wrap gap-1">
