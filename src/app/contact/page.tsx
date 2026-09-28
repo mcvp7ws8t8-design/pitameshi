@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { StaticPage } from "@/components/StaticPage";
 
-export const metadata: Metadata = { title: "お問い合わせ" };
+export const metadata: Metadata = { title: "お問い合わせ", alternates: { canonical: "/contact" } };
 
 /** 問い合わせは外部フォーム(Googleフォームなど)で受ける。CONTACT_FORM_URL に設定する。 */
 export default function ContactPage() {

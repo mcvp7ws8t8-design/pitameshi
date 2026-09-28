@@ -31,9 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-round text-2xl font-extrabold tracking-tight text-brand">
               ぴためし
             </Link>
-            <nav className="flex gap-4 text-sm font-semibold">
+            <nav className="flex gap-3 text-sm font-semibold sm:gap-4">
               <Link href="/search" className="hover:text-brand">
-                お店を探す
+                <span className="hidden sm:inline">お店を</span>探す
               </Link>
               <Link href="/cafes" className="hover:text-brand">
                 カフェ

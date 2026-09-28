@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { StaticPage } from "@/components/StaticPage";
 
-export const metadata: Metadata = { title: "免責事項・広告表記" };
+export const metadata: Metadata = { title: "免責事項・広告表記", alternates: { canonical: "/disclaimer" } };
 
 export default function DisclaimerPage() {
   return (

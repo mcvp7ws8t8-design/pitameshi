@@ -1,10 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd } from "@/components/JsonLd";
 import { LocationButton } from "@/components/LocationButton";
 import { PresetGrid } from "@/components/PresetGrid";
 import { RecentSearches } from "@/components/RecentSearches";
 import { SearchBox } from "@/components/SearchBox";
 import { getMasters, isMockMode } from "@/lib/hotpepper";
 import { EMPTY_STATE } from "@/lib/search/query";
+import { websiteLd } from "@/lib/seo";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function HomePage() {
   const masters = await getMasters();
@@ -12,6 +17,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-8">
+      <JsonLd data={websiteLd()} />
       {isMockMode() && <MockBanner />}
 
       <section className="rounded-3xl bg-brand px-5 py-7 text-white sm:px-8">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrNotice } from "@/components/Credits";
+import { JsonLd } from "@/components/JsonLd";
 import { ShopCard } from "@/components/ShopCard";
 import { engineDeps } from "@/lib/deps";
 import { isLandingPage, MIN_SHOPS_FOR_INDEX } from "@/lib/landing";
@@ -9,6 +10,7 @@ import { aggregate, percent } from "@/lib/search/aggregate";
 import { toView } from "@/lib/search/engine";
 import { applyPreset, PRESET_BY_ID } from "@/lib/search/presets";
 import { EMPTY_STATE, searchHref, type SearchState } from "@/lib/search/query";
+import { breadcrumbLd, shopListLd } from "@/lib/seo";
 
 /**
  * エリア×ジャンルのページ(F-05)。検索エンジンからの入口。
@@ -67,6 +69,16 @@ export default async function AreaGenrePage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <JsonLd
+        data={[
+          breadcrumbLd([
+            { name: "トップ", path: "/" },
+            { name: areaName, path: `/search?ma=${area}` },
+            { name: genreName, path: from },
+          ]),
+          shopListLd(`${areaName}の${genreName}`, views.map((v) => v.shop)),
+        ]}
+      />
       <nav className="text-xs text-ink-soft" aria-label="パンくず">
         <Link href="/">トップ</Link> › <Link href={`/search?ma=${area}`}>{areaName}</Link> › {genreName}
       </nav>

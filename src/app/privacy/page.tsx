@@ -3,7 +3,7 @@ import Link from "next/link";
 import { StaticPage } from "@/components/StaticPage";
 import { operatorName } from "@/lib/site";
 
-export const metadata: Metadata = { title: "プライバシーポリシー" };
+export const metadata: Metadata = { title: "プライバシーポリシー", alternates: { canonical: "/privacy" } };
 
 /**
  * ひな形。公開前に内容を確認し、使うサービス(アクセス解析など)に合わせて直すこと。

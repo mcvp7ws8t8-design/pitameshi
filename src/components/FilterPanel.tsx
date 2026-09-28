@@ -95,7 +95,12 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
   const [draft, setDraft] = useState<SearchState>(state);
 
   // URLが変わったら(チップで条件を外したときなど)下書きもそろえる
-  useEffect(() => setDraft(state), [state]);
+  const stateKey = serializeSearchState(state).toString();
+  const [syncedKey, setSyncedKey] = useState(stateKey);
+  if (stateKey !== syncedKey) {
+    setSyncedKey(stateKey);
+    setDraft(state);
+  }
   useEffect(() => {
     document.body.dataset.sheetOpen = open ? "true" : "false";
     return () => {
@@ -103,7 +108,7 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
     };
   }, [open]);
 
-  const dirty = serializeSearchState(draft).toString() !== serializeSearchState(state).toString();
+  const dirty = serializeSearchState(draft).toString() !== stateKey;
   const visibleFlagIds = useMemo(
     () => (showAll ? API_FLAGS.map((f) => f.id) : commonIds.filter((id) => API_FLAGS.some((f) => f.id === id))),
     [showAll, commonIds],

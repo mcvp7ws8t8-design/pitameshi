@@ -6,7 +6,7 @@ import { useState } from "react";
  * 条件のURL共有(U-05)。ログイン不要で、同じ検索結果をLINEなどで送れる。
  * スマホでは端末の共有メニュー、PCではURLをコピー。LINEで送るボタンも出す。
  */
-export function ShareButton({ path, title }: { path: string; title: string }) {
+export function ShareButton({ path, title, label = "この条件を共有" }: { path: string; title: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   const fullUrl = () => new URL(path, window.location.origin).toString();
@@ -29,7 +29,7 @@ export function ShareButton({ path, title }: { path: string; title: string }) {
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={share} className="rounded-full border border-line bg-card px-3 py-1.5 text-sm font-semibold hover:border-brand">
-        {copied ? "URLをコピーしました" : "この条件を共有"}
+        {copied ? "URLをコピーしました" : label}
       </button>
       <a
         href={`https://line.me/R/share?text=${encodeURIComponent(`${title}\n`)}`}

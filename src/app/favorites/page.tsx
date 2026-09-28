@@ -30,29 +30,29 @@ export default async function FavoritesPage({ searchParams }: Props) {
   }
 
   const { budgets } = await getMasters();
-  let failed = false;
-  const shops = await getShops(ids).catch((e) => {
+  const shops = await getShops(ids).catch((e: unknown) => {
     console.error("[favorites]", e);
-    failed = true;
-    return [];
+    return undefined;
   });
+  const failed = shops === undefined;
+  const list = shops ?? [];
   const path = `/favorites?ids=${ids.join(",")}`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">お気に入り({shops.length}件)</h1>
-        {shops.length > 0 && <ShareButton path={path} title="お気に入りのお店|ぴためし" />}
+        <h1 className="text-xl font-bold">お気に入り({list.length}件)</h1>
+        {list.length > 0 && <ShareButton path={path} title="お気に入りのお店|ぴためし" label="この一覧を共有" />}
       </div>
       {failed && <p className="rounded-xl border border-line bg-card p-4 text-sm">ただいまお店の情報を取得できません。時間をおいてもう一度お試しください。</p>}
-      {!failed && shops.length < ids.length && (
+      {!failed && list.length < ids.length && (
         <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs">掲載が終わったお店は表示されません。</p>
       )}
-      {shops.length > 0 && (
+      {list.length > 0 && (
         <>
           <PrNotice />
           <ul className="space-y-3">
-            {shops.map((s) => (
+            {list.map((s) => (
               <li key={s.id}>
                 <ShopCard view={toView(s, EMPTY_STATE, undefined, budgets)} from="/favorites" />
               </li>

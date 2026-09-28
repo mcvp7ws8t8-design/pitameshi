@@ -1,51 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { addRecent, isSavable, parseRecent, RECENT_KEY, type RecentSearch } from "@/lib/browser/recent";
-
-function load(): RecentSearch[] {
-  try {
-    return parseRecent(window.localStorage.getItem(RECENT_KEY));
-  } catch {
-    return []; // プライベートモードなどで使えないときは何もしない
-  }
-}
-
-function save(list: RecentSearch[]) {
-  try {
-    window.localStorage.setItem(RECENT_KEY, JSON.stringify(list));
-  } catch {
-    /* 保存できなくても検索には影響させない */
-  }
-}
+import { useEffect, useMemo } from "react";
+import { addRecent, isSavable, parseRecent, RECENT_KEY } from "@/lib/browser/recent";
+import { readStored, useStoredRaw, writeStored } from "@/lib/browser/useStored";
 
 /** 検索結果を開いたときに、その条件を「最近使った条件」に記録する(U-06)。画面には何も出さない。 */
 export function RememberSearch({ path, label, detail }: { path: string; label: string; detail: string }) {
   useEffect(() => {
     if (!isSavable(path)) return;
-    save(addRecent(load(), { path, label, detail, savedAt: Date.now() }));
+    const list = addRecent(parseRecent(readStored(RECENT_KEY)), { path, label, detail, savedAt: Date.now() });
+    writeStored(RECENT_KEY, JSON.stringify(list));
   }, [path, label, detail]);
   return null;
 }
 
 /** 最近使った条件をワンタップで呼び出す(U-06)。保存がなければ何も出さない。 */
 export function RecentSearches({ className = "" }: { className?: string }) {
-  const [list, setList] = useState<RecentSearch[]>([]);
-  useEffect(() => setList(load()), []);
+  const raw = useStoredRaw(RECENT_KEY);
+  const list = useMemo(() => parseRecent(raw), [raw]);
   if (list.length === 0) return null;
   return (
     <section className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">最近使った条件</h2>
-        <button
-          type="button"
-          className="text-xs text-ink-soft underline"
-          onClick={() => {
-            save([]);
-            setList([]);
-          }}
-        >
+        <button type="button" className="text-xs text-ink-soft underline" onClick={() => writeStored(RECENT_KEY, "[]")}>
           履歴を消す
         </button>
       </div>

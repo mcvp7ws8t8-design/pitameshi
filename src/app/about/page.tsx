@@ -3,7 +3,7 @@ import Link from "next/link";
 import { StaticPage } from "@/components/StaticPage";
 import { operatorName, SITE_NAME } from "@/lib/site";
 
-export const metadata: Metadata = { title: "運営者情報" };
+export const metadata: Metadata = { title: "運営者情報", alternates: { canonical: "/about" } };
 
 export default function AboutPage() {
   return (
