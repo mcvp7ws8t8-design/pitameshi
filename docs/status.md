@@ -25,22 +25,35 @@
 - ライブラリ部分は TypeScript の strict モードで型エラーなし
 - 全画面を仮データでサーバー描画し、例外なく表示されることを確認(検索・0件・現在地・詳細・エリア・カフェ・固定ページ)
 
-## 確認できていないこと(作成環境で npm が使えなかったため)
-- [ ] `npm install` → `npm run build` が通るか(Next.js・Tailwind・OpenNext のバージョン差で直しが必要な可能性あり)
-- [ ] 画面の見た目(Tailwind のスタイルが当たった状態)とスマホでの操作
-- [ ] `open-next.config.ts` の KV キャッシュの import パス
-- [ ] Cloudflare Workers 無料プランの 3MiB・CPU 10ms に収まるか(`npm run preview` で確認)
+## 2026-09-28 追記:ビルドと仮データでの画面確認(手順1・2、手順4の一部)
+インストールされた版:Next.js 16.3.6 / @opennextjs/cloudflare 1.20.6 / Tailwind CSS 4.3.3 / wrangler 4.142.0 / TypeScript 5.9.3
+
+- [x] `npm install` → `npm run typecheck` / `npm test`(36件)/ `npm run build` がすべて成功。コードの修正なしで通った
+  - `next build` が `tsconfig.json` を自動修正(`jsx: react-jsx` など)→ そのままコミット
+  - `next dev` が `CLAUDE.md` の末尾に Next.js 16 の案内ブロックを自動で足す → 毎回足されるのでコミットしておく
+  - `package-lock.json` をコミットし、CI を `npm ci` + npm キャッシュに戻した
+- [x] 画面の見た目:スマホ幅(390px)とPC幅(1280px)で、トップ・検索結果・0件時の提案・詳細・エリア×ジャンル・カフェを確認。Tailwind のスタイルは正しく当たっている
+  - 絞り込みパネルの「タバコ」で、「指定なし」と「全席禁煙」の React の key が両方 `none` になっていた → 修正(ブラウザのコンソールエラー0件に)
+- [x] `open-next.config.ts` の KV キャッシュの import パス(`@opennextjs/cloudflare/overrides/incremental-cache/kv-incremental-cache`)は 1.20.6 で正しい
+- [x] Worker のサイズ:`opennextjs-cloudflare build` → `wrangler deploy --dry-run` で **gzip 後 1,125 KiB**(無料プランの上限 3MiB 以内)
+- [x] ローカルの Workers 実行環境(`wrangler dev`)で全画面・`/api/count`・`/go/[id]` が動くことを確認(仮データ)
+
+## 確認できていないこと
+- [ ] CPU 10ms に収まるか(ローカルでは測れない。Cloudflare に公開後、ダッシュボードの CPU 時間で確認。特にサーバー側絞り込みで API を複数ページ呼ぶ検索)
+- [ ] スマホ実機での操作感(タップ・スクロール・現在地の許可)
 - [ ] ホットペッパーAPIの実データでの動作(マスタのコード、自由記述の文言、喫煙の表記)
 
 ## 次にやること(順番)
-1. `npm install` して `npm run build` を通す
-2. `.env.local` を作って `npm run dev` で画面を確認(まずは仮データのまま)
+1. ~~`npm install` して `npm run build` を通す~~(完了)
+2. ~~`.env.local` を作って `npm run dev` で画面を確認(まずは仮データのまま)~~(完了)
 3. ホットペッパーAPIキーを入れて実データで確認し、次を調整する
+   - **まず `npm run hp:check` を実行する**(`scripts/hotpepper/check.ts`)。下の項目の確認結果がまとめて出る(集計を画面に出すだけで、店舗データは保存しない)
    - `src/lib/hotpepper/masters.ts` の予備の値(ジャンル・予算コード)
    - `src/lib/search/interpret.ts` の「あり/なし」と喫煙の判定ルール
-   - `src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え
+   - ~~`src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え~~(完了:テキスト形式にした。ご利用案内で指定されている「画像提供:ホットペッパー グルメ」も、フッターと店舗詳細の写真の下に追加)
    - 誕生日・女子会プリセットのキーワードを、特集マスタAPIのコードに置き換え
-4. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id を差し替え、`npm run preview` で制限内か確認
+   - クラウド環境で作業するときは、環境設定の Network access で `webservice.recruit.co.jp` を許可し、環境変数に `HOTPEPPER_API_KEY` を入れる(新しいセッションから反映)
+4. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id を差し替え、`npm run preview` で制限内か確認(サイズとローカル動作は確認済み。残りは KV の id と公開後の CPU 時間)
 5. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。GitHub の Secrets を設定して OSM 取り込みを手動実行
 6. バリューコマースで提携後、`AFFILIATE_URL_TEMPLATE` を設定
 7. `src/lib/landing.ts` に、実データで件数が十分なエリア×ジャンルを追加

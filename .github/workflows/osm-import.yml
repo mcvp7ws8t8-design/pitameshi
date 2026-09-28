@@ -17,6 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install osmium
         run: sudo apt-get update && sudo apt-get install -y osmium-tool
@@ -34,7 +35,7 @@ jobs:
           osmium export data/stations.osm.pbf --add-unique-id=type_id -f geojsonseq -o data/stations.geojsonseq --overwrite
           wc -l data/cafes.geojsonseq data/stations.geojsonseq
 
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
 
       - name: Import into Supabase
         env:
