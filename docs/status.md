@@ -1,6 +1,7 @@
 # 開発の状況と次にやること
 
-2026-09-28 時点。Claude(claude.ai)で作成した最初の雛形。
+2026-09-29 時点。リリース1〜3のうち、コードだけで作れる機能はすべて実装済み。
+残りは外部サービスのアカウント・APIキーが必要な作業と、運営者が決める未決事項。
 
 ## 作ったもの
 
@@ -10,7 +11,7 @@
 | F-07 | クレジット・PR表記・運営者情報・プライバシーポリシー・免責事項・問い合わせ | 実装済み(文面はひな形) |
 | F-08 | 現在地から探す | 実装済み |
 | 絞り込み | APIで絞れる全項目(29項目)+サーバー側の条件 | 実装済み |
-| S-01 | 目的別プリセット15種(一人飲みは試験中で非表示) | 実装済み |
+| S-01 | 目的別プリセット15種(一人飲みは「試験中」表示) | 実装済み |
 | S-02 | お酒の「どれか」 | 実装済み |
 | S-03 | 喫煙可・分煙・全席禁煙 | 実装済み(判定ルールは実データで要調整) |
 | S-04〜S-06 | 条件バッジ・条件チップ・並び替え | 実装済み |
@@ -18,41 +19,45 @@
 | C-01, C-02 | OSMカフェの取り込み・カフェ検索 | 実装済み(実データ未取り込み) |
 | 駅から徒歩○分 | OSMの駅データから計算 | 実装済み(実データ未取り込み) |
 | C-03 | カフェの独自属性 | 表示・絞り込みは実装済み。登録はSupabaseの画面から直接(管理画面はなし) |
-| C-04, 今営業中, U-06, ログイン | リリース3 | 未着手 |
+| 今営業中 | 営業時間の記載を解析(`src/lib/search/hours.ts`)。読めない店は「不明」 | 実装済み(実データで要検証) |
+| U-06 | 最近使った条件(ブラウザに保存、現在地の検索は保存しない) | 実装済み |
+| F-12 | お気に入り(ログインなし・ブラウザに店舗IDだけ保存、`/favorites`) | 実装済み |
+| C-04 | 閉店チェック(OSM取り込み後に、消えた・店名変更・180日以上を一覧) | 実装済み(`0002` の適用が必要) |
+| SEO | 構造化データ(BreadcrumbList・ItemList/Restaurant・WebSite)、正規URL | 実装済み |
+| 計測 | GA4 に予約ボタンのクリック(`reserve_click`) | 実装済み |
+| F-11 | 会員登録・ログイン | 未着手(下の「決めてほしいこと」) |
+| F-14 | 他アフィリエイト追加 | 未着手(フェーズ3) |
 
-## 確認できたこと
-- 検索ロジック・URL変換・喫煙判定・集計・OSM変換などのテスト 36件がすべて成功(`npm test`)
-- ライブラリ部分は TypeScript の strict モードで型エラーなし
-- 全画面を仮データでサーバー描画し、例外なく表示されることを確認(検索・0件・現在地・詳細・エリア・カフェ・固定ページ)
+## 確認できたこと(2026-09-29、Claude Code)
+入ったバージョン:Next.js 16.3.6 / @opennextjs/cloudflare 1.20.6 / wrangler 4.143.0 / Tailwind 4.3.3 / ESLint 9
 
-## 初回ビルドの確認(2026-09-28、Claude Code)
-入ったバージョン:Next.js 16.3.6 / @opennextjs/cloudflare 1.20.6 / wrangler 4.143.0 / Tailwind 4.3.3
-
-- [x] `npm install` → `npm run typecheck` / `npm test`(36件)/ `npm run build` が修正なしで通った(Next.js が `tsconfig.json` の `jsx` などを自動で書き換えたので、それをコミット)
-- [x] `open-next.config.ts` の KV キャッシュの import パスは今のままで正しい(`opennextjs-cloudflare build` が成功)
-- [x] Worker のサイズ:gzip 後 1,125KiB(上限 3MiB の約37%)。`npx wrangler deploy --dry-run` で確認
-- [x] `npm run preview`(Workers の実行環境)で全画面が 200 で表示される。存在しない店は 404、`/go/[id]` は 302
-- [x] スマホ幅(390px)・PC幅(1280px)で、トップ・検索結果・0件・詳細・エリア・カフェを表示。Tailwind が当たり、横スクロールもブラウザのエラーもなし
-- [x] 直したこと:トップ・サイトマップ・robots.txt・canonical の基準URLはビルド時に静的に作られるため、wrangler の `vars.SITE_URL` が使われず `http://localhost:3000` になっていた。公開ジョブでは GitHub Variables の `SITE_URL` をビルド時に渡し、未設定なら公開を止めるようにした
-- [x] `package-lock.json` をコミットし、CI を `npm ci` に戻した
+- [x] `npm run typecheck` / `npm run lint` / `npm test`(56件)/ `npm run build` がすべて通る
+- [x] Worker のサイズ:gzip 後 1,142KiB(上限 3MiB の約37%)。`npx wrangler deploy --dry-run` で確認
+- [x] `npm run preview`(Workers の実行環境)で全画面が表示される。存在しない店は 404、`/go/[id]` は 302
+- [x] スマホ幅(390px)・PC幅(1280px)で表示を確認。横スクロールもブラウザのエラーもなし
+- [x] ブラウザ操作で確認:最近使った条件がトップに出る/☆保存 → `/favorites` に表示/今営業中のチップと絞り込み/エリアページの JSON-LD
+- [x] `open-next.config.ts` の KV キャッシュの import パスは正しい
+- [x] 静的ページ(トップ・サイトマップ・robots.txt)の基準URLはビルド時の `SITE_URL` を使うため、公開ジョブで GitHub Variables の `SITE_URL` を渡す(未設定なら公開を止める)
 
 ## 確認できていないこと
-- [ ] CPU 10ms に収まるか(ローカルの preview では測れない。公開後に Cloudflare のダッシュボードで CPU 時間を見る)
+- [ ] CPU 10ms に収まるか(ローカルでは測れない。公開後に Cloudflare のダッシュボードで CPU 時間を見る)
 - [ ] スマホ実機での操作(タップ・現在地の許可など)
-- [ ] ホットペッパーAPIの実データでの動作(マスタのコード、自由記述の文言、喫煙の表記)
+- [ ] ホットペッパーAPIの実データでの動作(マスタのコード、自由記述の文言、喫煙・営業時間の表記、`id` の複数指定)
+
+## 決めてほしいこと
+- **F-11 ログイン**:お気に入り・最近使った条件はログインなしで使えるようにした。ログインを入れると Supabase Auth(メール・Google)の設定、会員情報の扱い(プライバシーポリシー)、アカウント削除の導線が必要になる。入れるかどうか、入れるならいつか
+- **閉店したカフェの扱い**(要件定義書の未決事項):今は閉店チェックで一覧に出すだけで、`closed` は運営者が手で更新する
+- **一人飲みプリセット**:キーワード「カウンター」+居酒屋・バーで近似している。実データで結果を見て、出し続けるか決める
+- **地図タイル**:店舗詳細の地図は今は OpenStreetMap へのリンクだけ。埋め込み地図にするならタイル配信サービスを選ぶ
 
 ## 次にやること(順番)
-1. ~~`npm install` して `npm run build` を通す~~(済み)
-2. `.env.local` を作って `npm run dev` で画面を確認(まずは仮データのまま。上の確認で主な画面は表示できている)
-3. ホットペッパーAPIキーを入れて実データで確認し、次を調整する
+1. ホットペッパーAPIキーを入れて実データで確認し、次を調整する
    - `src/lib/hotpepper/masters.ts` の予備の値(ジャンル・予算コード)
-   - `src/lib/search/interpret.ts` の「あり/なし」と喫煙の判定ルール
+   - `src/lib/search/interpret.ts` の「あり/なし」と喫煙の判定ルール、`src/lib/search/hours.ts` の営業時間の解析
    - `src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え
    - 誕生日・女子会プリセットのキーワードを、特集マスタAPIのコードに置き換え
-4. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id と `vars.SITE_URL` を差し替え、GitHub の Variables に `SITE_URL`、Secrets に `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を設定
-5. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。GitHub の Secrets を設定して OSM 取り込みを手動実行
-6. バリューコマースで提携後、`AFFILIATE_URL_TEMPLATE` を設定
-7. `src/lib/landing.ts` に、実データで件数が十分なエリア×ジャンルを追加
-
-## メモ
-- ESLint は入れていない(Next.js 16 で `next lint` がなくなったため、必要になったら ESLint の flat config で追加する)
+2. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id と `vars.SITE_URL` を差し替え、GitHub の Variables に `SITE_URL`、Secrets に `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を設定
+3. Supabase を作り、`supabase/migrations/0001_init.sql` と `0002_cafe_closure_check.sql` を実行。GitHub の Secrets を設定して OSM 取り込みを手動実行
+4. バリューコマースで提携後、`AFFILIATE_URL_TEMPLATE` を設定
+5. GA4 の測定IDを `NEXT_PUBLIC_GA_ID` に設定し、`reserve_click` をキーイベントにする
+6. `src/lib/landing.ts` に、実データで件数が十分なエリア×ジャンルを追加

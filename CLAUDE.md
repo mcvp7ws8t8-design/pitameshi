@@ -11,7 +11,7 @@
 
 ## コマンド
 - `npm run dev` 開発サーバー(APIキー未設定なら仮データで動く)
-- `npm test` / `npm run typecheck` / `npm run build`
+- `npm test` / `npm run typecheck` / `npm run lint` / `npm run build`
 - `npm run preview` Workers の実行環境で確認 / `npm run deploy` 公開
 
 ## 守ること(規約・要件。変更するときはユーザーに確認)
@@ -28,14 +28,18 @@
 - `src/lib/search/query.ts` 検索条件 ⇔ URL(共有URL、U-05)
 - `src/lib/search/engine.ts` 検索の本体。APIだけで済む場合と、サーバー側で絞る場合(予算3帯以上・人数上限・席数・喫煙・駅徒歩・お酒の「どれか」・独自の並び順)を分けている。0件時の提案(U-02)もここ
 - `src/lib/search/interpret.ts` 店舗データの自由記述(「あり」「貸切不可」など)の解釈、喫煙判定
+- `src/lib/search/hours.ts` 営業時間の解析と「今営業中」の判定(日本時間)
+- `src/lib/browser/` ブラウザ(localStorage)に保存するもの:最近使った条件(U-06)、お気に入り(F-12、店舗IDだけ)
+- `src/lib/seo.ts` 構造化データ(JSON-LD)
 - `src/lib/hotpepper/` APIクライアント・型・マスタ・仮データ(`fixtures.ts`, `mock.ts`)
 - `src/lib/osm/` カフェ・駅(`providers.ts` が Supabase、`cafes.ts` が仮データと絞り込み)
-- `src/app/` 画面。`/search` 検索結果、`/shop/[id]` 詳細、`/area/[area]/[genre]` 集客用ページ、`/cafes` カフェ、`/go/[id]` 送客、`/api/count` 件数
-- `supabase/migrations/0001_init.sql` テーブルとRPC関数
+- `src/app/` 画面。`/search` 検索結果、`/shop/[id]` 詳細、`/area/[area]/[genre]` 集客用ページ、`/cafes` カフェ、`/go/[id]` 送客、`/favorites` お気に入り、`/api/count` 件数
+- `supabase/migrations/` テーブルとRPC関数(0002 は閉店チェック C-04)
+- `scripts/osm/` OSM取り込み(`import.ts`)と閉店チェック(`check-closed.ts`)
 - `.github/workflows/` CI・公開、OSM週次取り込み
 
 ## 要件定義書のID
 F-xx 機能 / S-xx 絞り込み強化 / C-xx カフェ / U-xx 使いやすさ。コメントにIDを書いてあるので、要件との対応はIDで検索できる。
 
 ## まだ確認できていないこと(最初にやる)
-`docs/status.md` を参照。`npm install` → build → Workers の preview までは確認済み。次はホットペッパーAPIの実データでの確認と、Cloudflare・Supabase の準備。
+`docs/status.md` を参照。コードだけで作れる機能はリリース3まで実装済み。次はホットペッパーAPIの実データでの確認と、Cloudflare・Supabase の準備。「決めてほしいこと」はユーザーに確認する。
