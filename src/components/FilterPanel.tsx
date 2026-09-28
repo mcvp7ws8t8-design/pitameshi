@@ -290,7 +290,7 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
           <fieldset key={id} className="space-y-1.5">
             <legend className="text-sm font-bold">タバコ</legend>
             {[{ id: undefined, label: "指定なし", help: undefined }, ...SMOKING_OPTIONS].map((o) => (
-              <label key={o.id ?? "none"} className="flex items-center gap-2 text-sm">
+              <label key={o.id ?? "any"} className="flex items-center gap-2 text-sm">
                 <input type="radio" name="smoking" checked={draft.smoking === o.id} onChange={() => set({ smoking: o.id })} />
                 {o.label}
                 <Help text={o.help} />

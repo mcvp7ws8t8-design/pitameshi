@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
       - run: npm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

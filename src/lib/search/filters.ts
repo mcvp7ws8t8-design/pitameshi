@@ -45,7 +45,11 @@ export type ApiFlagDef = {
   release: 1 | 2 | 3;
   /** APIに渡す値(ほとんどは "1"。クーポンだけ "0" = あり) */
   apiValue?: string;
-  /** 一覧のバッジや詳細に使うレスポンス項目 */
+  /**
+   * 一覧のバッジや詳細に使うレスポンス項目。
+   * sommelier・open_air・equipment・ktai・night_view などは検索条件には使えるが、
+   * 実際のレスポンスに項目がない(2026-09 実データで確認)ので field を持たない。
+   */
   field?: string;
 };
 
@@ -55,10 +59,10 @@ export const API_FLAGS: ApiFlagDef[] = [
   { kind: "apiFlag", id: "tatami", label: "座敷あり", category: "人数・席", release: 1, field: "tatami", help: "靴を脱いで上がる畳の席です。" },
   { kind: "apiFlag", id: "horigotatsu", label: "掘りごたつあり", category: "人数・席", release: 1, field: "horigotatsu", help: "座敷の床が掘り下げてあり、足を下ろして座れる席です。" },
   { kind: "apiFlag", id: "charter", label: "貸切できる", category: "人数・席", release: 1, field: "charter", help: "お店全体、またはフロアを自分たちだけで使えることです。人数の条件はお店ごとに違います。" },
-  { kind: "apiFlag", id: "open_air", label: "オープンエア(テラスなど)", category: "人数・席", release: 1, field: "open_air" },
+  { kind: "apiFlag", id: "open_air", label: "オープンエア(テラスなど)", category: "人数・席", release: 1 },
   // 飲む
   { kind: "apiFlag", id: "free_drink", label: "飲み放題あり", category: "飲む", release: 1, field: "free_drink" },
-  { kind: "apiFlag", id: "sommelier", label: "ソムリエがいる", category: "飲む", release: 1, field: "sommelier" },
+  { kind: "apiFlag", id: "sommelier", label: "ソムリエがいる", category: "飲む", release: 1 },
   // 食べる
   { kind: "apiFlag", id: "course", label: "コースあり", category: "食べる", release: 1, field: "course" },
   { kind: "apiFlag", id: "free_food", label: "食べ放題あり", category: "食べる", release: 1, field: "free_food" },
@@ -76,8 +80,8 @@ export const API_FLAGS: ApiFlagDef[] = [
   { kind: "apiFlag", id: "karaoke", label: "カラオケあり", category: "設備", release: 1, field: "karaoke" },
   { kind: "apiFlag", id: "band", label: "バンド演奏できる", category: "設備", release: 1, field: "band" },
   { kind: "apiFlag", id: "show", label: "ライブ・ショーあり", category: "設備", release: 1, field: "show" },
-  { kind: "apiFlag", id: "equipment", label: "エンタメ設備", category: "設備", release: 1, field: "equipment", help: "ダーツ・ビリヤードなどの遊べる設備です。" },
-  { kind: "apiFlag", id: "ktai", label: "携帯電話がつながる", category: "設備", release: 1, field: "ktai" },
+  { kind: "apiFlag", id: "equipment", label: "エンタメ設備", category: "設備", release: 1, help: "ダーツ・ビリヤードなどの遊べる設備です。" },
+  { kind: "apiFlag", id: "ktai", label: "携帯電話がつながる", category: "設備", release: 1 },
   // 支払い
   { kind: "apiFlag", id: "card", label: "カード払いできる", category: "支払い", release: 1, field: "card" },
   // 誰と

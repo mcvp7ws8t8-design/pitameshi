@@ -16,6 +16,17 @@ test("yesNo: 否定語を先に判定する", () => {
   assert.equal(yesNo(undefined), undefined);
 });
 
+test("yesNo: 実データの「判定 ：補足」形式は「：」より前で判定する", () => {
+  assert.equal(yesNo("なし ：詳細はお問い合わせください。"), false);
+  assert.equal(yesNo("あり ：※個室の詳細はお店にお問い合わせください"), true);
+  assert.equal(yesNo("貸切可 ：店舗の貸切等、詳細はお気軽に店舗までご相談ください♪（貸切ができない場合もございます）"), true);
+  assert.equal(yesNo("貸切不可 ：応相談"), false);
+  assert.equal(yesNo("あり ：【金土祝前】：当日来店後にて食べ飲み放題のご利用は不可"), true);
+  assert.equal(yesNo("お子様連れOK ：ご家族でもお食事可能です。"), true);
+  assert.equal(yesNo("お子様連れ不可"), false);
+  assert.equal(yesNo("利用不可"), false);
+});
+
 test("classifySmoking: 禁煙席の記載から判定", () => {
   assert.equal(classifySmoking("全面禁煙"), "none");
   assert.equal(classifySmoking("一部禁煙"), "separated");
@@ -45,6 +56,8 @@ test("estimateBudgetYen: 平均予算の文言を優先", () => {
   assert.equal(estimateBudgetYen(shop), 3500);
   const noAvg = { budget: { code: "B002", name: "2001～3000円", average: "" } } as never;
   assert.equal(estimateBudgetYen(noAvg), 2501);
+  const bare = { budget: { code: "B002", name: "2001～3000円", average: "3500" } } as never;
+  assert.equal(estimateBudgetYen(bare), 3500);
 });
 
 test("検索条件はURLと行き来できる(共有URL)", () => {

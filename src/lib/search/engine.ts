@@ -79,6 +79,8 @@ export function buildApiQuery(state: SearchState, alcohol?: AlcoholId): Hotpeppe
   if (state.middleAreas.length) q.middle_area = state.middleAreas;
   const kw = effectiveKeyword(state);
   if (kw) q.keyword = kw;
+  const special = PRESET_BY_ID.get(state.preset ?? "")?.special;
+  if (special) q.special = special;
   if (state.lat !== undefined && state.lng !== undefined) {
     q.lat = String(state.lat);
     q.lng = String(state.lng);
@@ -151,7 +153,19 @@ async function fetchCandidates(state: SearchState, deps: EngineDeps, maxPages: n
       }
     }
   }
-  return { shops: merged, complete: results.every((r) => r.complete) };
+  // APIの総件数。お酒の「どれか」で複数回呼んだときは、見た範囲の重なりの割合で重複を差し引く
+  const fetched = results.reduce((n, r) => n + r.shops.length, 0);
+  const apiTotal = results.reduce((n, r) => n + r.total, 0) * (fetched ? merged.length / fetched : 1);
+  return { shops: merged, apiTotal, complete: results.every((r) => r.complete) };
+}
+
+/**
+ * APIの全件を見られなかったときの件数の目安。
+ * 見た範囲で条件に合った割合を、APIの総件数にかけて推計する(見た範囲で合った件数より少なくはしない)。
+ */
+export function estimateTotal(matched: number, examined: number, apiTotal: number): number {
+  if (examined === 0) return 0;
+  return Math.max(matched, Math.round((matched / examined) * apiTotal));
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +297,7 @@ export async function runSearch(state: SearchState, deps: EngineDeps, opts: { ma
   }
 
   // --- サーバー側の処理が必要な場合:まとめて取ってから絞り込む ---
-  const { shops, complete } = await fetchCandidates(state, deps, opts.maxPages ?? MAX_API_PAGES);
+  const { shops, apiTotal, complete } = await fetchCandidates(state, deps, opts.maxPages ?? MAX_API_PAGES);
   let views = shops.map((s) => toView(s, state, undefined, budgets));
   let stationsAvailable = false;
   if (wantsStations || views.length) {
@@ -301,14 +315,16 @@ export async function runSearch(state: SearchState, deps: EngineDeps, opts: { ma
     state,
   );
   if (!complete) {
-    base.notes.push(`条件に合うお店が多いため、上位${(opts.maxPages ?? MAX_API_PAGES) * MAX_COUNT_PER_CALL}件の中から絞り込んでいます。場所を絞るとより正確になります。`);
+    base.notes.push(
+      `お店が多いため、上位${(opts.maxPages ?? MAX_API_PAGES) * MAX_COUNT_PER_CALL}件の中から条件に合う${filtered.length.toLocaleString()}件を表示しています。件数は目安です。場所を絞るとより正確になります。`,
+    );
   }
   const start = (state.page - 1) * PAGE_SIZE;
   return {
     ...base,
     status: "ok",
     items: filtered.slice(start, start + PAGE_SIZE),
-    total: filtered.length,
+    total: complete ? filtered.length : estimateTotal(filtered.length, shops.length, apiTotal),
     approximate: !complete,
     totalPages: Math.ceil(filtered.length / PAGE_SIZE),
   };
