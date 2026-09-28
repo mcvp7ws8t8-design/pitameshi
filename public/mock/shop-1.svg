@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="仮の写真">
+  <rect width="240" height="240" fill="#e3f2ef"/>
+  <circle cx="120" cy="128" r="72" fill="#fff" stroke="#0f766e" stroke-width="6"/>
+  <circle cx="120" cy="128" r="46" fill="#e9a23b" opacity=".85"/>
+  <circle cx="104" cy="116" r="10" fill="#fff" opacity=".8"/>
+  <rect x="34" y="60" width="8" height="120" rx="4" fill="#0f766e"/>
+  <rect x="198" y="60" width="8" height="120" rx="4" fill="#0f766e"/>
+  <text x="120" y="226" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f766e">SAMPLE</text>
+</svg>

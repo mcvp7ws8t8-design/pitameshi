@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* ぴためしの色と形。ホットペッパーなど既存サイトの配色に似せない(要件定義書)。 */
+@theme {
+  --color-ink: #1f2a2e;
+  --color-ink-soft: #5b6a70;
+  --color-paper: #fffaf3;
+  --color-card: #ffffff;
+  --color-line: #eadfce;
+  --color-brand: #0f766e; /* 深い青緑 */
+  --color-brand-strong: #0b5b55;
+  --color-brand-soft: #e3f2ef;
+  --color-accent: #e9a23b; /* からし色 */
+  --color-accent-soft: #fdf1dc;
+  --color-good: #2f7d4a;
+  --color-unknown: #8a8f93;
+  --radius-card: 14px;
+  --font-sans: var(--font-noto), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-round: var(--font-rounded), var(--font-noto), sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.7;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 絞り込みシートを開いている間は背景をスクロールさせない */
+body[data-sheet-open="true"] {
+  overflow: hidden;
+}

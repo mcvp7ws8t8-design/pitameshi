@@ -1,0 +1,44 @@
+# OSM のカフェ・駅データを週1回取り込む(要件定義書 C-01)
+# 必要な GitHub Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+name: OSM import
+
+on:
+  schedule:
+    - cron: "0 18 * * 0" # 毎週月曜 3:00(日本時間)
+  workflow_dispatch: {}
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install osmium
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool
+
+      - name: Download Japan extract (Geofabrik)
+        run: |
+          mkdir -p data
+          curl -fsSL -o data/japan-latest.osm.pbf https://download.geofabrik.de/asia/japan-latest.osm.pbf
+
+      - name: Extract cafes and stations
+        run: |
+          osmium tags-filter data/japan-latest.osm.pbf nwr/amenity=cafe -o data/cafes.osm.pbf --overwrite
+          osmium export data/cafes.osm.pbf --add-unique-id=type_id -f geojsonseq -o data/cafes.geojsonseq --overwrite
+          osmium tags-filter data/japan-latest.osm.pbf nwr/railway=station,halt -o data/stations.osm.pbf --overwrite
+          osmium export data/stations.osm.pbf --add-unique-id=type_id -f geojsonseq -o data/stations.geojsonseq --overwrite
+          wc -l data/cafes.geojsonseq data/stations.geojsonseq
+
+      - run: npm ci
+
+      - name: Import into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/osm/import.ts data/cafes.geojsonseq data/stations.geojsonseq

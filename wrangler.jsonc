@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pitameshi",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // ISR/fetch キャッシュ用。`npx wrangler kv namespace create NEXT_INC_CACHE_KV` で作成し、id を差し替える。
+  "kv_namespaces": [
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+  // 秘密情報は vars に書かず `npx wrangler secret put HOTPEPPER_API_KEY` などで登録する。
+  "vars": {
+    "SITE_URL": "https://example.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
