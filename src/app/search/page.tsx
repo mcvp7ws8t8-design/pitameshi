@@ -5,12 +5,13 @@ import { PrNotice } from "@/components/Credits";
 import { FilterPanel } from "@/components/FilterPanel";
 import { LocationButton } from "@/components/LocationButton";
 import { PresetGrid } from "@/components/PresetGrid";
+import { RecentSearches, RememberSearch } from "@/components/RecentSearches";
 import { SearchBox } from "@/components/SearchBox";
 import { ShareButton } from "@/components/ShareButton";
 import { ShopCard } from "@/components/ShopCard";
 import { engineDeps } from "@/lib/deps";
 import type { Masters } from "@/lib/hotpepper";
-import { rangeMeters, runSearch, suggestRelaxations, type RelaxSuggestion, type SearchResult } from "@/lib/search/engine";
+import { rangeMeters, removableConditions, runSearch, suggestRelaxations, type RelaxSuggestion, type SearchResult } from "@/lib/search/engine";
 import { commonFilterIds, PRESET_BY_ID } from "@/lib/search/presets";
 import { parseSearchState, searchHref, withPatch, type SearchState } from "@/lib/search/query";
 
@@ -73,6 +74,7 @@ export default async function SearchPage({ searchParams }: Props) {
           <SearchBox areas={masters.areas} base={state} />
           <LocationButton base={state} className="mt-2" />
         </div>
+        <RecentSearches />
         <section className="space-y-3">
           <h2 className="font-bold">目的を変える</h2>
           <PresetGrid base={state} current={state.preset} />
@@ -83,6 +85,10 @@ export default async function SearchPage({ searchParams }: Props) {
 
   const title = heading(state, masters);
   const path = searchHref(state);
+  const detail = removableConditions(state)
+    .filter((c) => c.id !== "includeUnknown")
+    .map((c) => c.label)
+    .join("・");
 
   return (
     <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
@@ -96,6 +102,7 @@ export default async function SearchPage({ searchParams }: Props) {
       />
 
       <div className="min-w-0 space-y-4">
+        {result && <RememberSearch path={searchHref({ ...state, page: 1 })} label={title} detail={detail} />}
         {deps.mock && (
           <p className="rounded-xl border border-dashed border-accent bg-accent-soft p-2 text-xs">開発モード:架空の仮データを表示しています。</p>
         )}

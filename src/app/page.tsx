@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LocationButton } from "@/components/LocationButton";
 import { PresetGrid } from "@/components/PresetGrid";
+import { RecentSearches } from "@/components/RecentSearches";
 import { SearchBox } from "@/components/SearchBox";
 import { getMasters, isMockMode } from "@/lib/hotpepper";
 import { EMPTY_STATE } from "@/lib/search/query";
@@ -25,6 +26,8 @@ export default async function HomePage() {
           <LocationButton base={EMPTY_STATE} className="mt-2" />
         </div>
       </section>
+
+      <RecentSearches />
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">目的から探す</h2>

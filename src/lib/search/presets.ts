@@ -173,7 +173,7 @@ export const PRESETS: Preset[] = [
 export const PRESET_BY_ID = new Map(PRESETS.map((p) => [p.id, p]));
 
 /** 公開中のリリース。これ以下の release のプリセット・機能を表示する。 */
-export const CURRENT_RELEASE = 2 as const;
+export const CURRENT_RELEASE = 3 as const;
 
 export function visiblePresets(release: number = CURRENT_RELEASE): Preset[] {
   return PRESETS.filter((p) => p.release <= release);
