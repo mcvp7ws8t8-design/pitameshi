@@ -29,6 +29,7 @@ export type SearchState = {
   alcohol: AlcoholId[];
   smoking?: SmokingFilter;
   walkMax?: number; // 駅から徒歩○分以内
+  openNow: boolean; // 今営業中(リリース3)
   includeUnknown: boolean;
   sort: SortId;
   preset?: string;
@@ -41,6 +42,7 @@ export const EMPTY_STATE: SearchState = {
   budgets: [],
   flags: [],
   alcohol: [],
+  openNow: false,
   includeUnknown: false,
   sort: "recommend",
   page: 1,
@@ -63,6 +65,7 @@ const K = {
   alcohol: "al",
   smoking: "sm",
   walkMax: "walk",
+  openNow: "open",
   includeUnknown: "unk",
   sort: "sort",
   preset: "p",
@@ -130,6 +133,7 @@ export function parseSearchState(params: ParamsLike): SearchState {
     alcohol: list(getParam(params, K.alcohol), (s) => alcoholIds.has(s)) as AlcoholId[],
     smoking: smoking && smokingIds.has(smoking) ? (smoking as SmokingFilter) : undefined,
     walkMax: walk !== undefined && walkValues.has(walk) ? walk : undefined,
+    openNow: getParam(params, K.openNow) === "1",
     includeUnknown: getParam(params, K.includeUnknown) === "1",
     sort: sort && sortIds.has(sort) ? (sort as SortId) : "recommend",
     preset: getParam(params, K.preset)?.replace(/[^a-z0-9-]/g, "").slice(0, 40) || undefined,
@@ -158,6 +162,7 @@ export function serializeSearchState(state: SearchState): URLSearchParams {
   if (state.alcohol.length) p.set(K.alcohol, [...state.alcohol].sort().join(","));
   if (state.smoking) p.set(K.smoking, state.smoking);
   if (state.walkMax !== undefined) p.set(K.walkMax, String(state.walkMax));
+  if (state.openNow) p.set(K.openNow, "1");
   if (state.includeUnknown) p.set(K.includeUnknown, "1");
   if (state.sort !== "recommend") p.set(K.sort, state.sort);
   if (state.page > 1) p.set(K.page, String(state.page));

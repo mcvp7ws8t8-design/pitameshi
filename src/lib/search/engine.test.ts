@@ -130,3 +130,21 @@ test("現在地検索:近い順は order を渡さない / おすすめ順は 4"
   assert.equal(buildApiQuery({ ...loc, sort: "distance" }).order, undefined);
   assert.equal(buildApiQuery(loc).order, "4");
 });
+
+test("今営業中:営業時間の記載から判定し、時間帯で結果が変わる", async () => {
+  const at = (iso: string) => ({ backend: createMockBackend(), now: () => new Date(iso) });
+  const state: SearchState = { ...shinjuku, openNow: true };
+  assert.equal(needsServerProcessing(state), true);
+  // 月曜 15:00(昼と夜の間)は、深夜営業の店も含めてどこも閉まっている
+  const afternoon = await runSearch(state, at("2026-09-28T15:00:00+09:00"));
+  assert.equal(afternoon.total, 0);
+  // 月曜 20:00 は開いている店がある
+  const evening = await runSearch(state, at("2026-09-28T20:00:00+09:00"));
+  assert.ok(evening.total > 0);
+  assert.ok(evening.items.every((v) => v.openNow === true));
+  assert.equal(evening.items[0]!.badges[0]!.label, "営業中");
+  // 火曜 1:00 は深夜営業(翌2:00まで)の店だけ
+  const lateNight = await runSearch(state, at("2026-09-29T01:00:00+09:00"));
+  assert.ok(lateNight.total > 0 && lateNight.total < evening.total);
+  assert.ok(removableConditions(state).some((c) => c.id === "openNow"));
+});

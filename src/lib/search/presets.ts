@@ -22,7 +22,7 @@ export type Preset = {
 };
 
 /** APIフラグ以外で「よく使う条件」に出せる項目 */
-export const SPECIAL_FILTER_IDS = ["genre", "budget", "partyMin", "partyMax", "smoking", "alcohol", "walk", "seatsMin"] as const;
+export const SPECIAL_FILTER_IDS = ["genre", "budget", "partyMin", "partyMax", "smoking", "alcohol", "walk", "seatsMin", "openNow"] as const;
 
 const DEFAULT_COMMON = ["genre", "budget", "partyMin", "private_room", "free_drink", "smoking", "alcohol", "midnight"];
 
@@ -61,7 +61,7 @@ export const PRESETS: Preset[] = [
     description: "23時以降も営業している居酒屋・バー",
     release: 1,
     apply: { genres: ["G001", "G002", "G012", "G011"], flags: ["midnight"] },
-    common: ["karaoke", "free_drink", "smoking", "walk", "midnight_meal"],
+    common: ["openNow", "karaoke", "free_drink", "smoking", "walk", "midnight_meal"],
   },
   {
     id: "settai",
@@ -119,7 +119,7 @@ export const PRESETS: Preset[] = [
     description: "ランチ営業のあるお店",
     release: 1,
     apply: { flags: ["lunch"] },
-    common: ["genre", "non_smoking", "card", "child", "walk"],
+    common: ["openNow", "genre", "non_smoking", "card", "child", "walk"],
   },
   {
     id: "kodure",

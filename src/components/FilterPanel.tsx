@@ -39,6 +39,7 @@ const SPECIAL_CATEGORY: Record<string, FilterCategory> = {
   alcohol: "飲む",
   smoking: "タバコ",
   walk: "場所",
+  openNow: "時間",
 };
 
 function Help({ text }: { text?: string }) {
@@ -129,6 +130,7 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
       seatsMin: undefined,
       smoking: undefined,
       walkMax: undefined,
+      openNow: false,
       preset: undefined,
       page: 1,
     });
@@ -319,6 +321,14 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
             </div>
           </fieldset>
         );
+      case "openNow":
+        return (
+          <label key={id} className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={draft.openNow} onChange={(e) => set({ openNow: e.target.checked })} />
+            <span className="font-bold">今営業中</span>
+            <Help text={GLOSSARY.openNow} />
+          </label>
+        );
       default:
         return null;
     }
@@ -420,7 +430,7 @@ export function FilterPanel({ state, genres, budgets, commonIds, total, approxim
       {/* スマホ:画面下に固定したボタン → 下から出るシート(U-04) */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 p-3 backdrop-blur lg:hidden">
         <button type="button" onClick={() => setOpen(true)} className="w-full rounded-full bg-brand py-3 font-bold text-white">
-          条件を変える({(state.flags.length + state.alcohol.length + (state.smoking ? 1 : 0) + state.genres.length + (state.budgets.length ? 1 : 0)).toString()})
+          条件を変える({(state.flags.length + state.alcohol.length + (state.smoking ? 1 : 0) + (state.openNow ? 1 : 0) + state.genres.length + (state.budgets.length ? 1 : 0)).toString()})
         </button>
       </div>
       {open && (

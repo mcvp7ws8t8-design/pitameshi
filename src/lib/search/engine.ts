@@ -4,6 +4,7 @@ import type { HotpepperBackend, HotpepperQuery, HotpepperShop } from "../hotpepp
 import { bboxAround, distanceMeters, RANGE_METERS, type LatLng } from "../geo";
 import type { Station, StationProvider } from "../osm/types";
 import { shopBadges, type Badge } from "./badges";
+import { isOpenAt } from "./hours";
 import { ALCOHOL_OPTIONS, API_FLAG_BY_ID, METERS_PER_WALK_MINUTE, SMOKING_OPTIONS, type AlcoholId } from "./filters";
 import {
   classifySmoking,
@@ -12,6 +13,7 @@ import {
   parseCount,
   shopLatLng,
   type SmokingClass,
+  type TriState,
 } from "./interpret";
 import { PRESET_BY_ID } from "./presets";
 import { hasLocation, type SearchState } from "./query";
@@ -36,6 +38,8 @@ export type ShopView = {
   budgetYen?: number;
   distanceM?: number;
   station?: { name: string; walkMinutes: number };
+  /** 今営業中か(「今営業中」を選んだときだけ計算する) */
+  openNow?: TriState;
   badges: Badge[];
 };
 
@@ -56,6 +60,8 @@ export type EngineDeps = {
   backend: HotpepperBackend;
   stations?: StationProvider;
   budgets?: BudgetMaster[];
+  /** 「今営業中」の判定に使う現在時刻(テスト用に差し替えられるようにしている) */
+  now?: () => Date;
 };
 
 // ---------------------------------------------------------------------------
@@ -107,6 +113,7 @@ export function needsServerProcessing(state: SearchState): boolean {
     state.seatsMin !== undefined ||
     state.smoking !== undefined ||
     state.walkMax !== undefined ||
+    state.openNow ||
     state.alcohol.length > 1 ||
     state.sort === "budget_asc" ||
     state.sort === "party_desc" ||
@@ -167,7 +174,7 @@ function nearestStation(point: LatLng, stations: Station[]): { station: Station;
   return best && best.meters <= MAX_STATION_SEARCH_M ? best : undefined;
 }
 
-export function toView(shop: HotpepperShop, state: SearchState, stations: Station[] | undefined, budgets: BudgetMaster[]): ShopView {
+export function toView(shop: HotpepperShop, state: SearchState, stations: Station[] | undefined, budgets: BudgetMaster[], now?: Date): ShopView {
   const smoking = classifySmoking(shop.non_smoking);
   const pos = shopLatLng(shop);
   const view: ShopView = {
@@ -185,8 +192,11 @@ export function toView(shop: HotpepperShop, state: SearchState, stations: Statio
     const near = nearestStation(pos, stations);
     if (near) view.station = { name: near.station.name, walkMinutes: Math.max(1, Math.ceil(near.meters / METERS_PER_WALK_MINUTE)) };
   }
-  const focus = [...state.flags, ...(state.smoking ? ["smoking"] : []), ...(state.partyMin || state.partyMax ? ["party"] : [])];
+  if (state.openNow) view.openNow = isOpenAt(shop.open, shop.close, now ?? new Date());
+  const focus = [...(state.openNow ? ["openNow"] : []), ...state.flags, ...(state.smoking ? ["smoking"] : []), ...(state.partyMin || state.partyMax ? ["party"] : [])];
   view.badges = shopBadges(shop, smoking, focus);
+  if (view.openNow === true) view.badges.unshift({ id: "openNow", label: "営業中", tone: "good" });
+  else if (state.openNow && view.openNow === undefined) view.badges.unshift({ id: "openNow", label: "営業時間:不明", tone: "unknown" });
   return view;
 }
 
@@ -210,6 +220,11 @@ export function passesServerFilters(v: ShopView, state: SearchState, stationsAva
     } else if (v.seats < state.seatsMin) return false;
   }
   if (state.smoking && !matchesSmoking(v.smoking, state.smoking, unk)) return false;
+  if (state.openNow) {
+    if (v.openNow === undefined) {
+      if (!unk) return false;
+    } else if (!v.openNow) return false;
+  }
   if (state.walkMax !== undefined && stationsAvailable) {
     if (!v.station) {
       if (!unk) return false;
@@ -253,6 +268,7 @@ async function loadStations(views: ShopView[], deps: EngineDeps): Promise<Statio
 
 export async function runSearch(state: SearchState, deps: EngineDeps, opts: { maxPages?: number } = {}): Promise<SearchResult> {
   const budgets = deps.budgets ?? FALLBACK_BUDGETS;
+  const now = deps.now?.() ?? new Date();
   const base = {
     page: state.page,
     pageSize: PAGE_SIZE,
@@ -284,13 +300,13 @@ export async function runSearch(state: SearchState, deps: EngineDeps, opts: { ma
 
   // --- サーバー側の処理が必要な場合:まとめて取ってから絞り込む ---
   const { shops, complete } = await fetchCandidates(state, deps, opts.maxPages ?? MAX_API_PAGES);
-  let views = shops.map((s) => toView(s, state, undefined, budgets));
+  let views = shops.map((s) => toView(s, state, undefined, budgets, now));
   let stationsAvailable = false;
   if (wantsStations || views.length) {
     const stations = await loadStations(views, deps);
     if (stations) {
       stationsAvailable = true;
-      views = shops.map((s) => toView(s, state, stations, budgets));
+      views = shops.map((s) => toView(s, state, stations, budgets, now));
     }
   }
   if (wantsStations && !stationsAvailable) {
@@ -339,6 +355,7 @@ export function removableConditions(state: SearchState): { id: string; label: st
     const label = SMOKING_OPTIONS.find((o) => o.id === state.smoking)?.label ?? "タバコの条件";
     out.push({ id: "smoking", label, state: s({ smoking: undefined }) });
   }
+  if (state.openNow) out.push({ id: "openNow", label: "今営業中", state: s({ openNow: false }) });
   if (state.walkMax !== undefined) out.push({ id: "walk", label: `駅から徒歩${state.walkMax}分以内`, state: s({ walkMax: undefined }) });
   if (state.partyMax !== undefined) out.push({ id: "partyMax", label: `宴会${state.partyMax}名以下`, state: s({ partyMax: undefined }) });
   if (state.seatsMin !== undefined) out.push({ id: "seatsMin", label: `席数${state.seatsMin}席以上`, state: s({ seatsMin: undefined }) });
@@ -352,7 +369,7 @@ export function removableConditions(state: SearchState): { id: string; label: st
   }
   if (state.budgets.length) out.push({ id: "budget", label: "予算", state: s({ budgets: [] }) });
   if (state.genres.length) out.push({ id: "genre", label: "ジャンル", state: s({ genres: [] }) });
-  if (!state.includeUnknown && (state.smoking || state.walkMax || state.partyMax || state.seatsMin)) {
+  if (!state.includeUnknown && (state.smoking || state.walkMax || state.partyMax || state.seatsMin || state.openNow)) {
     out.push({ id: "includeUnknown", label: "(不明の店も含める)", state: s({ includeUnknown: true }) });
   }
   return out;
