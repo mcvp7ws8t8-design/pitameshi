@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PrNotice } from "@/components/Credits";
+import { PHOTO_CREDIT, PrNotice } from "@/components/Credits";
 import { getShop } from "@/lib/hotpepper";
 import { shopBadges } from "@/lib/search/badges";
 import { classifySmoking, SMOKING_LABEL, shopLatLng, yesNo } from "@/lib/search/interpret";
@@ -60,6 +60,7 @@ export default async function ShopPage({ params }: Props) {
       <div className="overflow-hidden rounded-3xl border border-line bg-card">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={shop.photo.pc.l} alt="" className="h-56 w-full bg-accent-soft object-cover sm:h-72" />
+        <p className="px-4 pt-1 text-right text-[11px] text-ink-soft">{PHOTO_CREDIT}</p>
         <div className="space-y-2 p-4">
           <p className="text-sm text-ink-soft">
             {shop.genre.name} ・ {shop.small_area?.name ?? shop.middle_area?.name}

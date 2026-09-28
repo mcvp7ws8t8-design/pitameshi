@@ -47,10 +47,12 @@
 1. ~~`npm install` して `npm run build` を通す~~(完了)
 2. ~~`.env.local` を作って `npm run dev` で画面を確認(まずは仮データのまま)~~(完了)
 3. ホットペッパーAPIキーを入れて実データで確認し、次を調整する
+   - **まず `npm run hp:check` を実行する**(`scripts/hotpepper/check.ts`)。下の項目の確認結果がまとめて出る(集計を画面に出すだけで、店舗データは保存しない)
    - `src/lib/hotpepper/masters.ts` の予備の値(ジャンル・予算コード)
    - `src/lib/search/interpret.ts` の「あり/なし」と喫煙の判定ルール
-   - `src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え
+   - ~~`src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え~~(完了:テキスト形式にした。ご利用案内で指定されている「画像提供:ホットペッパー グルメ」も、フッターと店舗詳細の写真の下に追加)
    - 誕生日・女子会プリセットのキーワードを、特集マスタAPIのコードに置き換え
+   - クラウド環境で作業するときは、環境設定の Network access で `webservice.recruit.co.jp` を許可し、環境変数に `HOTPEPPER_API_KEY` を入れる(新しいセッションから反映)
 4. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id を差し替え、`npm run preview` で制限内か確認(サイズとローカル動作は確認済み。残りは KV の id と公開後の CPU 時間)
 5. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。GitHub の Secrets を設定して OSM 取り込みを手動実行
 6. バリューコマースで提携後、`AFFILIATE_URL_TEMPLATE` を設定

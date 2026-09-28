@@ -3,18 +3,23 @@ import Link from "next/link";
 /**
  * 出典表示(F-07)。
  * - ホットペッパーグルメ Webサービス:APIを使う全ページにクレジット表示が必要。
- *   正式なHTMLは https://webservice.recruit.co.jp/doc/hotpepper/guideline.html の「クレジット」から選んで貼り替えること。
+ *   ご利用案内(https://webservice.recruit.co.jp/doc/hotpepper/guideline.html)の「c.テキスト形式」を使う。
+ *   店舗の写真を出すときは「画像提供:ホットペッパー グルメ」の明記も必要(同ページ「3.画像利用の際のクレジット」)。
  * - OpenStreetMap:ODbL。「© OpenStreetMap contributors」+ 著作権ページへのリンク。
  */
+/** 店舗写真のクレジット。文言はご利用案内の指定どおり。 */
+export const PHOTO_CREDIT = "画像提供:ホットペッパー グルメ";
+
 export function Credits() {
   return (
     <div className="space-y-1 text-xs text-ink-soft">
       <p>
-        {/* TODO: ご利用案内の指定クレジット(画像またはテキストのHTML)に差し替える */}
+        Powered by{" "}
         <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noopener" className="underline">
-          Powered by ホットペッパーグルメ Webサービス
+          ホットペッパーグルメ Webサービス
         </a>
       </p>
+      <p>{PHOTO_CREDIT}</p>
       <p>
         カフェ・駅のデータ:
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" className="underline">

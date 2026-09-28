@@ -12,7 +12,8 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "osm:import": "tsx scripts/osm/import.ts"
+    "osm:import": "tsx scripts/osm/import.ts",
+    "hp:check": "tsx scripts/hotpepper/check.ts"
   },
   "dependencies": {
     "next": "^16.0.0",
