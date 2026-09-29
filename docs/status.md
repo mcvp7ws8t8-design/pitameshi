@@ -44,7 +44,7 @@
 - [ ] Supabase(OSMのカフェ・駅データ)を入れた状態での動作(カフェ検索・駅から徒歩)
 
 ## 次にやること(アカウントが必要なもの。順番)
-1. Cloudflare のアカウントを作り、管理画面で KV(名前 `NEXT_INC_CACHE_KV`)を作成して、その ID を `wrangler.jsonc` に入れる
+1. ~~Cloudflare のアカウントを作り、管理画面で KV(名前 `NEXT_INC_CACHE_KV`)を作成して、その ID を `wrangler.jsonc` に入れる~~(済み)
 2. Cloudflare で APIトークン(テンプレート「Cloudflare Workers を編集する」)を作り、アカウントIDと一緒に GitHub の Secrets に登録(`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`・`HOTPEPPER_API_KEY`)
 3. `main` にマージすると GitHub Actions が公開する。公開後に表示された `https://pitameshi.<サブドメイン>.workers.dev` を Secrets の `SITE_URL` に登録し、もう一度公開する
 4. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY` を GitHub の Secrets に登録し(公開時に Workers にも渡る)、OSM 取り込み(Actions)を手動実行
