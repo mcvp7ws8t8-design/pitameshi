@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createMockBackend } from "../hotpepper/mock";
 import type { HotpepperBackend, HotpepperQuery } from "../hotpepper/types";
-import { buildApiQuery, countResults, needsServerProcessing, removableConditions, runSearch, suggestRelaxations } from "./engine";
+import { buildApiQuery, countResults, estimateTotal, needsServerProcessing, removableConditions, runSearch, suggestRelaxations } from "./engine";
 import { applyPreset, PRESET_BY_ID } from "./presets";
 import { EMPTY_STATE, type SearchState } from "./query";
 import type { StationProvider } from "../osm/types";
@@ -129,4 +129,19 @@ test("現在地検索:近い順は order を渡さない / おすすめ順は 4"
   const loc = { ...EMPTY_STATE, lat: 35.69, lng: 139.7, range: 3 };
   assert.equal(buildApiQuery({ ...loc, sort: "distance" }).order, undefined);
   assert.equal(buildApiQuery(loc).order, "4");
+});
+
+test("誕生日・女子会プリセットは特集コードをAPIに渡す", () => {
+  const birthday = applyPreset(shinjuku, PRESET_BY_ID.get("birthday")!);
+  assert.equal(buildApiQuery(birthday).special, "LU0019");
+  assert.equal(buildApiQuery(birthday).keyword, undefined);
+  const joshikai = applyPreset(shinjuku, PRESET_BY_ID.get("joshikai")!);
+  assert.equal(buildApiQuery(joshikai).special, "LU0022");
+  assert.equal(buildApiQuery(shinjuku).special, undefined);
+});
+
+test("全件を見られないときは、合った割合から件数を推計する", () => {
+  assert.equal(estimateTotal(143, 200, 990), 708);
+  assert.equal(estimateTotal(5, 200, 201), 5);
+  assert.equal(estimateTotal(0, 0, 500), 0);
 });

@@ -17,6 +17,8 @@ export type Preset = {
   release: 1 | 2 | 3;
   mode?: "shop" | "cafe";
   beta?: boolean;
+  /** ホットペッパーの特集コード(特集マスタAPI)。検索時にAPIの special に渡す */
+  special?: string;
   apply: Partial<Pick<SearchState, "genres" | "budgets" | "flags" | "partyMin" | "keyword" | "alcohol" | "sort">>;
   common: string[];
 };
@@ -85,20 +87,20 @@ export const PRESETS: Preset[] = [
     id: "birthday",
     label: "誕生日・記念日",
     emoji: "🎂",
-    description: "お祝いに使えるお店(キーワード「誕生日」)",
+    description: "誕生日・記念日のサービスがあるお店、1人3,001〜10,000円",
     release: 2,
-    // TODO: 特集マスタAPIの「誕生日・記念日」系の特集コードが確認できたら special に置き換える
-    apply: { keyword: "誕生日", budgets: budgetCodesFor(3001, 10000) },
+    special: "LU0019", // 特集「誕生日・記念日サービスあり」
+    apply: { budgets: budgetCodesFor(3001, 10000) },
     common: ["private_room", "night_view", "course", "genre", "budget"],
   },
   {
     id: "joshikai",
     label: "女子会",
     emoji: "🥂",
-    description: "飲み放題つきのお店(キーワード「女子会」)",
+    description: "女性に人気の飲み放題つきのお店",
     release: 2,
-    // TODO: 特集コードに置き換える
-    apply: { keyword: "女子会", flags: ["free_drink"] },
+    special: "LU0022", // 特集「女子の行きつけのお店」
+    apply: { flags: ["free_drink"] },
     common: ["private_room", "smoking", "alcohol", "budget", "genre"],
   },
   {
@@ -193,7 +195,7 @@ export function applyPreset(base: SearchState, preset: Preset): SearchState {
     partyMin: preset.apply.partyMin,
     partyMax: undefined,
     seatsMin: undefined,
-    // プリセットのキーワード(「誕生日」など)は検索時に足す(engine.ts)。利用者が入れたキーワードはそのまま残す。
+    // プリセットのキーワード・特集コードは検索時に足す(engine.ts)。利用者が入れたキーワードはそのまま残す。
     keyword: base.keyword,
     alcohol: preset.apply.alcohol ?? [],
     smoking: undefined,

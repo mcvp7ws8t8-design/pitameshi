@@ -34,7 +34,7 @@ jobs:
           osmium export data/stations.osm.pbf --add-unique-id=type_id -f geojsonseq -o data/stations.geojsonseq --overwrite
           wc -l data/cafes.geojsonseq data/stations.geojsonseq
 
-      - run: npm install  # package-lock.json をコミットしたら npm ci に戻す
+      - run: npm ci
 
       - name: Import into Supabase
         env:

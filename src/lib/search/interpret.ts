@@ -13,7 +13,9 @@ const YES_WORDS = ["あり", "可", "OK", "ＯＫ", "歓迎", "いる", "営業�
 
 export function yesNo(value: string | undefined | null): TriState {
   if (!value) return undefined;
-  const v = value.trim();
+  // 実データは「あり ：個室の詳細はお問い合わせください」「貸切可 ：…貸切ができない場合もございます」のように
+  // 「判定 ：補足」の形。補足の言葉に引きずられないよう、「：」より前だけで判定する。
+  const v = value.split(/[：:]/)[0]!.trim();
   if (!v) return undefined;
   if (UNKNOWN_WORDS.some((w) => v.includes(w))) return undefined;
   // 「貸切不可」は「可」も含むので、否定語を先に見る
@@ -70,7 +72,8 @@ export function estimateBudgetYen(shop: HotpepperShop, budgets: BudgetMaster[] =
   const avg = shop.budget?.average;
   if (avg) {
     const normalized = avg.replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0)).replace(/,/g, "");
-    const m = normalized.match(/(\d{3,6})\s*円/);
+    // 「3000円」を優先し、なければ「3500」のような円のない数字も拾う
+    const m = normalized.match(/(\d{3,6})\s*円/) ?? normalized.match(/^\s*(\d{3,6})\s*$/);
     if (m) return Number.parseInt(m[1]!, 10);
   }
   const master = budgets.find((b) => b.code === shop.budget?.code);

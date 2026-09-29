@@ -37,5 +37,15 @@
 ## 要件定義書のID
 F-xx 機能 / S-xx 絞り込み強化 / C-xx カフェ / U-xx 使いやすさ。コメントにIDを書いてあるので、要件との対応はIDで検索できる。
 
-## まだ確認できていないこと(最初にやる)
-`docs/status.md` を参照。この雛形は npm が使えない環境で書いたため、`npm install` 後の初回ビルドで出るエラーを直すところから始める。
+## 今の状況
+`docs/status.md` を参照。ビルド・実データでの確認は済み。残りは Cloudflare・Supabase・バリューコマースのアカウントが必要な作業と、本番での CPU 時間の確認。
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

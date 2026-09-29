@@ -1,6 +1,6 @@
 # 開発の状況と次にやること
 
-2026-09-28 時点。Claude(claude.ai)で作成した最初の雛形。
+2026-09-28 時点。雛形の作成後、`npm install`・ビルド・ホットペッパーAPIの実データでの確認まで完了。
 
 ## 作ったもの
 
@@ -21,29 +21,35 @@
 | C-04, 今営業中, U-06, ログイン | リリース3 | 未着手 |
 
 ## 確認できたこと
-- 検索ロジック・URL変換・喫煙判定・集計・OSM変換などのテスト 36件がすべて成功(`npm test`)
-- ライブラリ部分は TypeScript の strict モードで型エラーなし
-- 全画面を仮データでサーバー描画し、例外なく表示されることを確認(検索・0件・現在地・詳細・エリア・カフェ・固定ページ)
+- テスト 39件がすべて成功(`npm test`)、型エラーなし(`npm run typecheck`)
+- `npm install` → `npm run build` が修正なしで成功(Next.js 16.3 / Tailwind 4.3 / OpenNext 1.20)
+- `open-next.config.ts` の KV キャッシュの import パスはそのままで Workers 向けビルドが成功
+- Worker のサイズ:gzip 後 1.1MiB(無料プランの上限 3MiB 以内。`wrangler deploy --dry-run` で確認)
+- ローカルの Workers 実行環境(`wrangler dev`)で、実APIキーを使い全画面が表示できることを確認(検索・プリセット・喫煙・お酒の「どれか」・予算3帯以上・現在地・0件・詳細・エリア・件数API・`/go` の送客)
+- スマホ幅(iPhone 13)で横スクロールが出ないこと、見た目が崩れていないことをスクリーンショットで確認
 
-## 確認できていないこと(作成環境で npm が使えなかったため)
-- [ ] `npm install` → `npm run build` が通るか(Next.js・Tailwind・OpenNext のバージョン差で直しが必要な可能性あり)
-- [ ] 画面の見た目(Tailwind のスタイルが当たった状態)とスマホでの操作
-- [ ] `open-next.config.ts` の KV キャッシュの import パス
-- [ ] Cloudflare Workers 無料プランの 3MiB・CPU 10ms に収まるか(`npm run preview` で確認)
-- [ ] ホットペッパーAPIの実データでの動作(マスタのコード、自由記述の文言、喫煙の表記)
+## ホットペッパーAPIの実データで直したこと(2026-09-28)
+- 予算マスタ:5,001円以上が細かくなっていた(B004〜B006 が廃止され B015〜B021 に)。予備の値と仮データを更新
+- ジャンルマスタ:予備の値と一致(変更なし)
+- 「あり/なし」の判定:実データは「なし :詳細はお問い合わせください」「貸切可 :…できない場合もございます」のような「判定 :補足」の形だったので、「:」より前だけで判定するよう修正
+- 喫煙:「禁煙席」項目の値は「全面禁煙」「禁煙席なし」「一部禁煙」の3種類だけ(1,600店で確認)。今の判定ルールで全部分類できる
+- ソムリエ・オープンエア・エンタメ設備・携帯・夜景は、検索条件には使えるが店舗データに項目がない(絞り込みには使えるが、バッジや詳細には出せない)
+- 誕生日・女子会プリセットを、キーワードから特集コードに変更(誕生日・記念日サービスあり `LU0019`、女子の行きつけのお店 `LU0022`)
+- クレジット:ご利用案内の指定テキスト(Powered by ホットペッパーグルメ Webサービス)に差し替え、写真を載せているため必須の「【画像提供:ホットペッパー グルメ】」も追加
+- 件数の目安:サーバー側で絞るとき、上位200件のうち合った件数をそのまま出していたため、実データでは極端に少なく出ていた(例:新宿の居酒屋 990件で喫煙可が「約143件」)。見た範囲で合った割合から全体を推計するよう修正(→ 約708件)
+- エリア×ジャンルページ:実データで150件以上ある25の組み合わせを登録(`src/lib/landing.ts`)
 
-## 次にやること(順番)
-1. `npm install` して `npm run build` を通す
-2. `.env.local` を作って `npm run dev` で画面を確認(まずは仮データのまま)
-3. ホットペッパーAPIキーを入れて実データで確認し、次を調整する
-   - `src/lib/hotpepper/masters.ts` の予備の値(ジャンル・予算コード)
-   - `src/lib/search/interpret.ts` の「あり/なし」と喫煙の判定ルール
-   - `src/components/Credits.tsx` のクレジットを、ご利用案内の指定HTMLに差し替え
-   - 誕生日・女子会プリセットのキーワードを、特集マスタAPIのコードに置き換え
-4. Cloudflare のアカウントを作り、KV を作成して `wrangler.jsonc` の id を差し替え、`npm run preview` で制限内か確認
-5. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。GitHub の Secrets を設定して OSM 取り込みを手動実行
-6. バリューコマースで提携後、`AFFILIATE_URL_TEMPLATE` を設定
-7. `src/lib/landing.ts` に、実データで件数が十分なエリア×ジャンルを追加
+## 確認できていないこと
+- [ ] 本番の Workers での CPU 時間(無料プランは1リクエスト10ms)。ローカルでは上限がかからないため、公開後に Cloudflare のダッシュボードで「CPU時間」を確認する。超える場合は `MAX_API_PAGES` を 1 に下げる、または有料プラン(Workers Paid)を検討
+- [ ] Supabase(OSMのカフェ・駅データ)を入れた状態での動作(カフェ検索・駅から徒歩)
+
+## 次にやること(アカウントが必要なもの。順番)
+1. ~~Cloudflare のアカウントを作り、管理画面で KV(名前 `NEXT_INC_CACHE_KV`)を作成して、その ID を `wrangler.jsonc` に入れる~~(済み)
+2. Cloudflare で APIトークン(テンプレート「Cloudflare Workers を編集する」)を作り、アカウントIDと一緒に GitHub の Secrets に登録(`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`・`HOTPEPPER_API_KEY`)
+3. `main` にマージすると GitHub Actions が公開する。公開後に表示された `https://pitameshi.<サブドメイン>.workers.dev` を Secrets の `SITE_URL` に登録し、もう一度公開する
+4. Supabase を作り、`supabase/migrations/0001_init.sql` を実行。`SUPABASE_URL`・`SUPABASE_SERVICE_ROLE_KEY` を GitHub の Secrets に登録し(公開時に Workers にも渡る)、OSM 取り込み(Actions)を手動実行
+5. バリューコマースでホットペッパーと提携後、`AFFILIATE_URL_TEMPLATE` を設定
+6. 運営者名(`OPERATOR_NAME`)・問い合わせフォーム(`CONTACT_FORM_URL`)を設定し、プライバシーポリシー・免責事項の文面(ひな形)を確認
 
 ## メモ
 - ESLint は入れていない(Next.js 16 で設定方法が変わっているため、`npm install` 後に `npx eslint --init` か公式手順で追加する)

@@ -8,17 +8,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // ISR/fetch キャッシュ用。`npx wrangler kv namespace create NEXT_INC_CACHE_KV` で作成し、id を差し替える。
+  // ISR/fetch キャッシュ用(Cloudflare の管理画面で作成した KV「NEXT_INC_CACHE_KV」)。
   "kv_namespaces": [
     {
       "binding": "NEXT_INC_CACHE_KV",
-      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+      "id": "198331420fc5451082465d20e7730aaf"
     }
   ],
-  // 秘密情報は vars に書かず `npx wrangler secret put HOTPEPPER_API_KEY` などで登録する。
-  "vars": {
-    "SITE_URL": "https://example.com"
-  },
+  // SITE_URL・APIキーなどは vars に書かず、GitHub の Secrets に登録する(公開時に Workers の secret として渡す。.github/workflows/ci.yml)。
   "observability": {
     "enabled": true
   }
