@@ -29,6 +29,14 @@
   #btns{display:flex;gap:16px}
   #btns button{width:96px;height:96px;border-radius:50%;border:0;font-size:18px;font-weight:bold;color:#fff;touch-action:none}
   #actBtn{background:#e8504a}#chopBtn{background:#3a8bd8}
+  #shop{display:none;position:fixed;inset:0;background:#000d;overflow:auto;z-index:10;align-items:flex-start;justify-content:center}
+  #shop .panel{background:#2b2622;border-radius:12px;margin:12px;padding:14px;width:520px;max-width:calc(100vw - 24px)}
+  #shop h2{margin:0 0 8px;font-size:20px;display:flex;justify-content:space-between}
+  #shop .row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #fff2}
+  #shop .row div{flex:1;font-size:14px}#shop .row small{display:block;opacity:.7;margin:0}
+  #shop .row button{padding:8px 12px;border:0;border-radius:8px;background:#e8a23a;font-weight:bold;min-width:84px}
+  #shop .row button:disabled{background:#555;color:#999}
+  #shop .close{margin-top:10px;width:100%;padding:10px;border:0;border-radius:8px;font-size:16px}
   #chips button{font-size:12px;padding:3px 7px;border-radius:12px;border:0;background:#3a5a44;color:#fff;cursor:pointer}
 </style>
 </head>
@@ -40,7 +48,9 @@
   <button data-n="3">AI 1人と協力</button>
   <button data-n="4">AI 2人と協力</button>
   <button data-n="5">AI 3人と協力</button>
+  <button id="shopBtn" style="background:#7CFC7C">🏪 お店を強化</button>
 </div>
+<div id="shop"></div>
 <div id="touch">
   <div id="pad"><div id="knob"></div></div>
   <div id="btns"><button id="chopBtn">切る<br>(長押し)</button><button id="actBtn">つかむ<br>置く</button></div>
@@ -72,13 +82,45 @@ const RECIPES = [
   { name: "トマトスープ", need: ["tomato:cooked"] },
   { name: "きざみレタス", need: ["lettuce:chopped"] },
 ];
-const GAME_TIME = 120, CHOP_TIME = 1.5, COOK_TIME = 6, BURN_TIME = 12;
+let gameTime = 120, chopTime = 1.5, cookTime = 6, burnTime = 12, orderLife = 50, speedMul = 1, aiMul = 1;
+
+// ---- お店経営(稼いだお金で設備を強化。保存される) ----
+const UPS = [
+  { id: "speed", name: "🥾 ランニングシューズ", desc: "移動が速くなる (+10%/Lv)", cost: [400, 800, 1600] },
+  { id: "knife", name: "🔪 よく切れる包丁", desc: "切る時間が短くなる (-15%/Lv)", cost: [400, 800, 1600] },
+  { id: "stove", name: "🔥 強火コンロ", desc: "煮る時間が短くなる (-15%/Lv)", cost: [400, 800, 1600] },
+  { id: "time", name: "⏱ 営業時間延長", desc: "1回の営業が長くなる (+10秒/Lv)", cost: [500, 1000, 2000] },
+  { id: "patience", name: "🪑 くつろぎ席", desc: "お客が待ってくれる (+8秒/Lv)", cost: [400, 800, 1600] },
+  { id: "ai", name: "🤖 AI研修", desc: "AIの動きが速くなる (+10%/Lv)", cost: [600, 1200, 2400] },
+];
+const SOUP_COST = 600, YEN_PER_SCORE = 4;
+let save = { money: 0, up: {}, soup: false };
+try { save = { ...save, ...JSON.parse(localStorage.getItem("ck-save") || "{}") }; } catch {}
+const persist = () => { try { localStorage.setItem("ck-save", JSON.stringify(save)); } catch {} };
+const lv = id => save.up[id] || 0;
+function applyUpgrades() {
+  speedMul = 1 + 0.1 * lv("speed"); aiMul = 1 + 0.1 * lv("ai");
+  chopTime = 1.5 * (1 - 0.15 * lv("knife")); cookTime = 6 * (1 - 0.15 * lv("stove")); burnTime = cookTime + 6;
+  gameTime = 120 + 10 * lv("time"); orderLife = 50 + 8 * lv("patience");
+}
+const menuRecipes = () => RECIPES.filter(r => save.soup || r.name !== "トマトスープ");
+
+// ---- キッチンのイベント ----
+const EVENTS = {
+  blackout: { icon: "⚡", name: "停電", dur: 12, msg: "停電だ! 手元しか見えない" },
+  slippery: { icon: "🧼", name: "床がツルツル", dur: 15, msg: "床が滑る! 急には止まれない" },
+  rush: { icon: "🎉", name: "団体客ラッシュ", dur: 20, msg: "団体客が来た! 提供ボーナス2倍" },
+  fire: { icon: "🔥", name: "コンロ火事", dur: 0, msg: "コンロが燃えた! 片付けよう" },
+  mouse: { icon: "🐭", name: "ネズミ", dur: 0, msg: "ネズミが食材を盗んだ!" },
+};
+let ev = null, evNext = 25, banner = { txt: "", t: 0 };
+const dark = document.createElement("canvas"); dark.width = 960; dark.height = 640;
 
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
 const tiles = MAP.map(r => [...r].map(t => ({ t, item: null, prog: 0, stove: "idle" })));
 const keys = new Set();
 addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT") return;
+  if (e.target.tagName === "INPUT" || shopOpen) return;
   keys.add(e.code);
   if (state === "title") {
     if (e.code === "Digit1") start(1);
@@ -94,7 +136,8 @@ addEventListener("keydown", e => {
 });
 addEventListener("keyup", e => keys.delete(e.code));
 
-let spawnEvery = 16, selBot = 0;
+let shopOpen = false;
+let spawnEvery = 16, selBot = 0, earned = 0;
 let state = "title", players = [], orders = [], score = 0, timeLeft = 0, spawnIn = 0, popups = [];
 let best = 0;
 try { best = +localStorage.getItem("ck-best") || 0; } catch {}
@@ -117,7 +160,7 @@ function start(n) {
     players.filter(p => p.ai).forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
     chat("ai", "ヒント: 名前を呼んで指示(例「ポチ、切って」)。「みんな、〜」で全員。覚えた料理は全員で共有。");
   }
-  orders = []; score = 0; timeLeft = GAME_TIME; spawnIn = 0; popups = [];
+  orders = []; score = 0; applyUpgrades(); ev = null; evNext = 25; banner.t = 0; timeLeft = gameTime; spawnIn = 0; popups = [];
   state = "play";
 }
 
@@ -150,7 +193,7 @@ function interact(p) {
     const key = h.contents.map(itemKey).sort().join(",");
     const o = orders.filter(o => [...o.r.need].sort().join(",") === key).sort((a, b) => a.t - b.t)[0];
     if (o) {
-      const pts = 20 + Math.floor(o.t / 5);
+      const pts = (20 + Math.floor(o.t / 5)) * (isEv("rush") ? 2 : 1);
       score += pts; orders.splice(orders.indexOf(o), 1); popup("+" + pts, p.x, p.y, "#7CFC7C");
     } else { score -= 5; popup("-5 注文と違う!", p.x, p.y, "#ff7777"); }
     p.item = null; return;
@@ -182,12 +225,18 @@ function update(dt) {
   if (timeLeft <= 0) {
     state = "end";
     if (score > best) { best = score; try { localStorage.setItem("ck-best", best); } catch {} }
+    earned = Math.max(0, score) * YEN_PER_SCORE; save.money += earned; persist();
     return;
   }
   spawnIn -= dt;
-  if (spawnIn <= 0 && orders.length < 4) {
-    orders.push({ r: RECIPES[Math.floor(Math.random() * RECIPES.length)], t: 50, max: 50 });
-    spawnIn = spawnEvery;
+  if (banner.t > 0) banner.t -= dt;
+  evNext -= dt;
+  if (ev) { ev.t -= dt; if (ev.t <= 0) { ev = null; evNext = 15 + Math.random() * 10; } }
+  else if (evNext <= 0 && timeLeft > 12) startEvent();
+  if (spawnIn <= 0 && orders.length < (isEv("rush") ? 6 : 4)) {
+    const mr = menuRecipes();
+    orders.push({ r: mr[Math.floor(Math.random() * mr.length)], t: orderLife, max: orderLife });
+    spawnIn = isEv("rush") ? spawnEvery / 2 : spawnEvery;
   }
   for (const o of orders) o.t -= dt;
   for (let i = orders.length - 1; i >= 0; i--)
@@ -199,37 +248,56 @@ function update(dt) {
       const bc = target(p);
       if (p.chopping && bc && bc.t === "C" && bc.item && bc.item.state === "raw") {
         bc.prog += dt;
-        if (bc.prog >= CHOP_TIME) { bc.item.state = "chopped"; bc.prog = 0; }
+        if (bc.prog >= chopTime) { bc.item.state = "chopped"; bc.prog = 0; }
       }
       continue;
     }
     let dx = (keys.has(p.keys.right) ? 1 : 0) - (keys.has(p.keys.left) ? 1 : 0);
     let dy = (keys.has(p.keys.down) ? 1 : 0) - (keys.has(p.keys.up) ? 1 : 0);
     if (!dx && !dy && p === players[0] && Math.hypot(joy.x, joy.y) > 0.3) { dx = joy.x; dy = joy.y; }
+    let tvx = 0, tvy = 0;
     if (dx || dy) {
       p.dir = Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
-      const l = Math.hypot(dx, dy), sp = 4.2 * dt / l, r = 0.3;
-      const nx = p.x + dx * sp, ny = p.y + dy * sp;
-      const free = (x, y) => ![[-r, -r], [r, -r], [-r, r], [r, r]].some(([a, b]) => solid(Math.floor(x + a), Math.floor(y + b)));
-      if (free(nx, p.y)) p.x = nx;
-      if (free(p.x, ny)) p.y = ny;
+      const l = Math.hypot(dx, dy); tvx = dx / l * 4.2 * speedMul; tvy = dy / l * 4.2 * speedMul;
     }
+    if (isEv("slippery")) {
+      const k = Math.min(1, 2.2 * dt); p.vx = (p.vx || 0) + (tvx - (p.vx || 0)) * k; p.vy = (p.vy || 0) + (tvy - (p.vy || 0)) * k;
+    } else { p.vx = tvx; p.vy = tvy; }
+    if (p.vx || p.vy) moveBy(p, p.vx * dt, p.vy * dt);
     const c = target(p);
     if (c && c.t === "C" && c.item && c.item.state === "raw" && (keys.has(p.keys.chop) || (p === players[0] && touchChop))) {
       c.prog += dt;
-      if (c.prog >= CHOP_TIME) { c.item.state = "chopped"; c.prog = 0; }
+      if (c.prog >= chopTime) { c.item.state = "chopped"; c.prog = 0; }
     }
   }
   for (const row of tiles) for (const c of row) {
     if (c.t !== "S") continue;
     if (c.stove === "cooking" || c.stove === "done") {
       c.prog += dt;
-      if (c.stove === "cooking" && c.prog >= COOK_TIME) c.stove = "done";
-      if (c.prog >= BURN_TIME) c.stove = "burnt";
+      if (c.stove === "cooking" && c.prog >= cookTime) c.stove = "done";
+      if (c.prog >= burnTime) c.stove = "burnt";
     }
   }
   popups.forEach(q => { q.life -= dt; q.y -= dt * 0.6; });
   popups = popups.filter(q => q.life > 0);
+}
+
+const isEv = t => ev && ev.type === t;
+function startEvent() {
+  const type = Object.keys(EVENTS)[Math.floor(Math.random() * 5)], d = EVENTS[type];
+  banner = { txt: `${d.icon} ${d.msg}`, t: 3.5 };
+  if (d.dur) ev = { type, t: d.dur }; else evNext = 15 + Math.random() * 10;
+  if (type === "rush") spawnIn = 0;
+  if (type === "fire") {
+    const st = tiles.flat().filter(c => c.t === "S"); const c = st[Math.floor(Math.random() * st.length)];
+    c.stove = "burnt"; c.prog = 0;
+  }
+  if (type === "mouse") {
+    const cs = tiles.flat().filter(c => c.item && (c.t === "#" || c.t === "C"));
+    if (cs.length) cs[Math.floor(Math.random() * cs.length)].item = null; else banner.txt = "🐭 ネズミは何も盗めなかった";
+  }
+  const bots = players.filter(p => p.ai);
+  if (bots.length) { const b = bots[Math.floor(Math.random() * bots.length)]; b.say = { blackout: "真っ暗〜!", slippery: "うわ、滑る!", rush: "忙しくなるよ!", fire: "あちち!", mouse: "こらー!" }[type]; b.sayT = 2.5; }
 }
 
 function moveBy(p, dx, dy) {
@@ -444,7 +512,7 @@ function botUpdate(b, dt) {
   if (c.phase === "walk") {
     const wp = c.path[0];
     if (!wp) { c.phase = "act"; c.t = 0; b.dir = [c.n.tx - Math.floor(b.x), c.n.ty - Math.floor(b.y)]; return; }
-    const tx = wp[0] + 0.5, ty = wp[1] + 0.5, ex = tx - b.x, ey = ty - b.y, sp = 4 * dt;
+    const tx = wp[0] + 0.5, ty = wp[1] + 0.5, ex = tx - b.x, ey = ty - b.y, sp = 4 * dt * speedMul * aiMul;
     if (Math.abs(ex) > 0.04) { b.dir = [Math.sign(ex), 0]; moveBy(b, Math.sign(ex) * Math.min(sp, Math.abs(ex)), 0); }
     else if (Math.abs(ey) > 0.04) { b.dir = [0, Math.sign(ey)]; moveBy(b, 0, Math.sign(ey) * Math.min(sp, Math.abs(ey))); }
     else { b.x = tx; b.y = ty; c.path.shift(); }
@@ -534,11 +602,11 @@ function draw() {
       if (c.stove === "cooking") txt("🍅♨", cx, cy, 22);
       if (c.stove === "done") txt("🍲", cx, cy, 34);
       if (c.stove === "burnt") txt("🔥", cx, cy, 34);
-      if (c.stove === "cooking" || c.stove === "done") bar(px, py, Math.min(1, c.prog / COOK_TIME), c.stove === "done" ? "#ff9a3c" : "#7CFC7C");
+      if (c.stove === "cooking" || c.stove === "done") bar(px, py, Math.min(1, c.prog / cookTime), c.stove === "done" ? "#ff9a3c" : "#7CFC7C");
     }
     if (c.item) {
       drawItem(c.item, cx, cy - 4);
-      if (c.t === "C" && c.prog > 0) bar(px, py, c.prog / CHOP_TIME, "#7CFC7C");
+      if (c.t === "C" && c.prog > 0) bar(px, py, c.prog / chopTime, "#7CFC7C");
     }
   }
   for (const p of players) {
@@ -557,17 +625,36 @@ function draw() {
       }
     }
   }
+  if (isEv("blackout") && state === "play") {
+    const dc = dark.getContext("2d");
+    dc.globalCompositeOperation = "source-over"; dc.fillStyle = "rgba(0,0,0,.9)"; dc.fillRect(0, 0, 960, 640);
+    dc.globalCompositeOperation = "destination-out";
+    for (const p of players) {
+      const g = dc.createRadialGradient(p.x * T, p.y * T, 20, p.x * T, p.y * T, 130);
+      g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      dc.fillStyle = g; dc.fillRect(p.x * T - 130, p.y * T - 130, 260, 260);
+    }
+    ctx.drawImage(dark, 0, 0);
+  }
   // HUD
   txt(`スコア ${score}`, 100, 680, 32, "center");
   txt(`のこり ${Math.max(0, Math.ceil(timeLeft))}秒`, 275, 680, 32, "center", timeLeft < 20 ? "#ff7777" : "#fff");
   ctx.restore();
+  const on = orders.length, cw = Math.min(138, Math.floor(572 / Math.max(1, on)) - 6);
   orders.forEach((o, i) => {
-    const x = 388 + i * 144;
-    ctx.fillStyle = o.t < 12 ? "#a33" : "#2a2a2a"; ctx.fillRect(x, 644, 138, 72);
-    txt(o.r.name, x + 69, 660, 20);
-    txt(o.r.need.map(k => EMOJI[k.split(":")[0]] + (k.endsWith("cooked") ? "♨" : "✂")).join(" "), x + 69, 686, 22);
-    ctx.fillStyle = "#7CFC7C"; ctx.fillRect(x, 708, 138 * Math.max(0, o.t / o.max), 8);
+    const x = 388 + i * (cw + 6);
+    ctx.fillStyle = o.t < 12 ? "#a33" : "#2a2a2a"; ctx.fillRect(x, 644, cw, 72);
+    txt(o.r.name, x + cw / 2, 660, cw < 120 ? 14 : 20);
+    txt(o.r.need.map(k => EMOJI[k.split(":")[0]] + (k.endsWith("cooked") ? "♨" : "✂")).join(" "), x + cw / 2, 686, 22);
+    ctx.fillStyle = "#7CFC7C"; ctx.fillRect(x, 708, cw * Math.max(0, o.t / o.max), 8);
   });
+  if (ev && state === "play") {
+    const d = EVENTS[ev.type], label = `${d.icon} ${d.name} ${Math.ceil(ev.t)}秒`;
+    ctx.fillStyle = "#000a"; ctx.fillRect(330, 4, 300, 34); txt(label, 480, 21, 22, "center", "#ffd66b");
+  }
+  if (banner.t > 0 && state === "play") {
+    ctx.fillStyle = "#000c"; ctx.fillRect(120, 270, 720, 80); txt(banner.txt, 480, 310, 34, "center", "#ffd66b");
+  }
   for (const q of popups) txt(q.txt, q.x * T, q.y * T, 24, "center", q.col);
   if (state !== "play") {
     ctx.fillStyle = "rgba(0,0,0,.72)"; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -578,11 +665,12 @@ function draw() {
       txt("お皿(🍽)に盛ってから提供。コンロは放置すると焦げる!", 480, 348, 20);
       txt("下のボタン(数字キー1〜5も可)で開始", 480, 430, 30, "center", "#ffd66b");
       txt("AIに日本語で指示して手順を教えよう。覚えた料理は全員で共有・保存されます", 480, 480, 18);
-      txt(`ベストスコア ${best}`, 480, 530, 22);
+      txt(`ベストスコア ${best}　所持金 ¥${save.money}`, 480, 530, 22);
     } else {
       txt("タイムアップ!", 480, 220, 54);
       txt(`スコア ${score}${score >= best && score > 0 ? "  🎉ベスト更新" : ""}`, 480, 310, 40);
-      txt("Enter / タップ でタイトルへ", 480, 410, 26, "center", "#ffd66b");
+      txt(`稼いだお金 +¥${earned}　(所持金 ¥${save.money})`, 480, 370, 30, "center", "#7CFC7C");
+      txt("Enter / タップ でタイトルへ → 「お店を強化」でパワーアップ", 480, 430, 22, "center", "#ffd66b");
     }
   }
 }
@@ -617,7 +705,29 @@ $("actBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (state
 const chopBtn = $("chopBtn");
 chopBtn.addEventListener("pointerdown", e => { e.preventDefault(); chopBtn.setPointerCapture(e.pointerId); touchChop = true; });
 ["pointerup", "pointercancel"].forEach(t => chopBtn.addEventListener(t, () => { touchChop = false; }));
-document.querySelectorAll("#menu button").forEach(b => b.onclick = () => start(+b.dataset.n));
+document.querySelectorAll("#menu button[data-n]").forEach(b => b.onclick = () => start(+b.dataset.n));
+function renderShop() {
+  const sh = $("shop");
+  const pips = n => "●".repeat(n) + "○".repeat(3 - n);
+  let h = `<div class="panel"><h2><span>🏪 お店を強化</span><span>所持金 ¥${save.money}</span></h2>`;
+  h += `<div class="row"><div>🍲 新メニュー「トマトスープ」<small>切ったトマトをコンロで煮る料理。注文に出るようになる</small></div>` +
+    (save.soup ? `<button disabled>解放済み</button>` : `<button data-buy="soup" ${save.money < SOUP_COST ? "disabled" : ""}>¥${SOUP_COST}</button>`) + `</div>`;
+  for (const u of UPS) {
+    const l = lv(u.id);
+    h += `<div class="row"><div>${u.name} <small>${u.desc}　${pips(l)}</small></div>` +
+      (l >= 3 ? `<button disabled>MAX</button>` : `<button data-buy="${u.id}" ${save.money < u.cost[l] ? "disabled" : ""}>¥${u.cost[l]}</button>`) + `</div>`;
+  }
+  h += `<button class="close">とじる</button></div>`;
+  sh.innerHTML = h;
+  sh.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => buy(b.dataset.buy));
+  sh.querySelector(".close").onclick = () => { shopOpen = false; sh.style.display = "none"; };
+}
+function buy(id) {
+  if (id === "soup") { if (save.money < SOUP_COST || save.soup) return; save.money -= SOUP_COST; save.soup = true; }
+  else { const u = UPS.find(x => x.id === id), l = lv(id); if (l >= 3 || save.money < u.cost[l]) return; save.money -= u.cost[l]; save.up[id] = l + 1; }
+  persist(); renderShop();
+}
+$("shopBtn").onclick = () => { shopOpen = true; renderShop(); $("shop").style.display = "flex"; };
 cv.addEventListener("pointerdown", () => { if (state === "end") state = "title"; });
 let shownState = "";
 function syncUi() {
