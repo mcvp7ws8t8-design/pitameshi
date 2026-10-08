@@ -8,8 +8,12 @@
   html,body{margin:0;background:#1d1a17;color:#fff;font-family:system-ui,sans-serif;height:100%;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
   input{-webkit-user-select:text;user-select:text}
-  canvas{max-width:100vw;max-height:calc(100vh - 28px);background:#e8d9b5}
-  small{opacity:.6;margin-top:4px}
+  button{font-family:inherit}
+  #stage{position:relative;max-width:100vw}
+  canvas{display:block;max-width:100vw;max-height:calc(100vh - 28px);background:#1d1a17}
+  small.hint{opacity:.6;margin-top:4px}
+  #pauseBtn{display:none;position:absolute;right:6px;top:6px;z-index:5;width:36px;height:36px;border-radius:8px;border:0;background:#000a;color:#fff;font-size:18px}
+
   #aiUi{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:4px 8px}
   #chat{height:64px;overflow:auto;background:#0008;font-size:13px;padding:4px 6px;border-radius:4px}
   #aiUi form{display:flex;gap:4px;margin-top:4px}
@@ -18,28 +22,45 @@
   #who button{font-size:13px;padding:3px 9px;border-radius:12px;border:2px solid transparent;color:#fff;cursor:pointer}
   #who button.sel{border-color:#fff}
   #chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-  @media (max-width:700px){body{justify-content:flex-start}#chips{flex-wrap:nowrap;overflow-x:auto}#chips button{white-space:nowrap;font-size:14px;padding:6px 10px}#chat{height:52px}}
-  @media (pointer:coarse){.kbonly{display:none}}
-  #menu,#touch{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:8px}
-  #menu{flex-wrap:wrap;gap:8px;justify-content:center}
-  #menu button{font-size:20px;padding:12px 18px;border:0;border-radius:10px;background:#e8a23a;color:#222;font-weight:bold;cursor:pointer}
-  #touch{justify-content:space-between;align-items:center;touch-action:none}
+  #chips button{font-size:12px;padding:3px 7px;border-radius:12px;border:0;background:#3a5a44;color:#fff;cursor:pointer}
+
+  #touch{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:8px;justify-content:space-between;align-items:center;touch-action:none}
   #pad{position:relative;width:150px;height:150px;border-radius:50%;background:#fff2;border:2px solid #fff4;touch-action:none}
   #knob{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:#fffa;pointer-events:none}
   #btns{display:flex;gap:16px}
   #btns button{width:96px;height:96px;border-radius:50%;border:0;font-size:18px;font-weight:bold;color:#fff;touch-action:none}
   #actBtn{background:#e8504a}#chopBtn{background:#3a8bd8}
-  #chips button{font-size:12px;padding:3px 7px;border-radius:12px;border:0;background:#3a5a44;color:#fff;cursor:pointer}
+
+  /* ---- メニュー画面 ---- */
+  #ui{display:none;position:fixed;inset:0;z-index:20;background:rgba(20,16,12,.95);align-items:center;justify-content:center;overflow:auto}
+  .scr{display:none;flex-direction:column;align-items:center;gap:12px;width:min(720px,100vw);box-sizing:border-box;padding:14px;max-height:100%;overflow:auto}
+  .scr h1{margin:0;font-size:34px}.scr h2{margin:0}
+  .big{font-size:20px;padding:14px 22px;border:0;border-radius:12px;background:#e8a23a;color:#222;font-weight:bold;cursor:pointer;min-width:240px}
+  .big.sub{background:#4a4540;color:#fff}
+  .big:disabled{background:#555;color:#999;cursor:default}
+  #worldTabs{display:flex;gap:6px;overflow-x:auto;width:100%;padding-bottom:4px}
+  #worldTabs button{flex:0 0 auto;min-width:52px;border:2px solid transparent;border-radius:10px;background:#3a342e;color:#fff;padding:4px 6px;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+  #worldTabs button span{font-size:22px}#worldTabs button small{font-size:10px;opacity:.8}
+  #worldTabs button.sel,#stageGrid button.sel,#modePick button.sel{border-color:#ffd66b}
+  #worldTabs button.lock,#stageGrid button.lock{opacity:.45}
+  #stageGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%}
+  #stageGrid button{border:2px solid transparent;border-radius:10px;background:#4a4137;color:#fff;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+  #stageGrid button b{font-size:20px}#stageGrid button small{color:#ffcc44;font-size:12px}
+  #stageInfo{width:100%;background:#2b2622;border-radius:10px;padding:8px 12px;box-sizing:border-box;font-size:14px}
+  #stageInfo h3{margin:0 0 4px;font-size:18px}#stageInfo em{font-style:normal;color:#ffd66b;font-size:13px}
+  #stageInfo p{margin:3px 0}#stageInfo .tip{color:#9fe3b0}
+  #modePick{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  #modePick button{border:2px solid transparent;border-radius:10px;background:#3a342e;color:#fff;padding:8px 12px;cursor:pointer;font-size:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .stars{font-size:46px;color:#ffcc44;letter-spacing:6px}
+  @media (pointer:coarse){.kbonly{display:none!important}}
+  @media (max-width:700px){#chips{flex-wrap:nowrap;overflow-x:auto}#chips button{white-space:nowrap;font-size:14px;padding:6px 10px}#chat{height:52px}body{justify-content:flex-start}.scr h1{font-size:26px}}
 </style>
 </head>
 <body>
-<canvas id="c" width="960" height="720"></canvas>
-<div id="menu">
-  <button data-n="1">ひとり</button>
-  <button data-n="2" class="kbonly">ふたり(キーボード)</button>
-  <button data-n="3">AI 1人と協力</button>
-  <button data-n="4">AI 2人と協力</button>
-  <button data-n="5">AI 3人と協力</button>
+<div id="stage">
+  <canvas id="c" width="960" height="720"></canvas>
+  <button id="pauseBtn" title="ポーズ">⏸</button>
 </div>
 <div id="touch">
   <div id="pad"><div id="knob"></div></div>
@@ -51,812 +72,44 @@
   <form id="chatForm"><input id="chatIn" autocomplete="off" placeholder="AIに指示・教える 例: レタスを取って"><button>送信</button></form>
   <div id="chips"></div>
 </div>
-<small class="kbonly">1P: WASD移動 / E=つかむ・置く / Q長押し=切る　2P: 矢印 / . = つかむ・置く / , 長押し=切る　3/4/5: AI 1〜3人と協力(日本語で指示して教える)</small>
-<script>
-"use strict";
-const T = 80, W = 15, H = 10;   // 論理サイズ。描画時に0.8倍して960x640に収める
-const MAP = [
-  "#TTLL#SS#######",
-  "#.............#",
-  "P.......#..B.B#",
-  "#.......K.....#",
-  "Z..CC...K..B.B#",
-  "#..CC...K.....#",
-  "X.......K..B.B#",
-  "#.......#.....#",
-  "#.............E",
-  "###CC##########",
-];
-const EMOJI = { tomato: "🍅", lettuce: "🥬" };
-const NAME = { tomato: "トマト", lettuce: "レタス" };
-const RECIPES = [
-  { name: "サラダ", need: ["lettuce:chopped", "tomato:chopped"] },
-  { name: "トマトスープ", need: ["tomato:cooked"] },
-  { name: "きざみレタス", need: ["lettuce:chopped"] },
-];
-const gameTime = 120, chopTime = 1.5, cookTime = 6, burnTime = 12, orderLife = 70, speedMul = 1, aiMul = 1;
-// ---- ホール(お客さん・お皿・洗い物) ----
-const tableOrderWait = 35, eatTime = 8, payWait = 20, washTime = 2.5, START_PLATES = 5;
-const CUSTOMERS = ["🧑", "👩", "👨", "👵", "🧒", "👴"];
-let plates = START_PLATES;
-const isCounter = c => c.t === "#" || c.t === "K";
-const plateKey = it => it.contents.map(x => x.type + ":" + x.state).sort().join(",");
+<small class="hint kbonly">1P: WASD移動 / E=つかむ・置く / Q長押し=切る・洗う　2P: 矢印 / . / , 長押し　Esc=ポーズ</small>
 
-// ---- キッチンのイベント ----
-const EVENTS = {
-  blackout: { icon: "⚡", name: "停電", dur: 12, msg: "停電だ! 手元しか見えない" },
-  slippery: { icon: "🧼", name: "床がツルツル", dur: 15, msg: "床が滑る! 急には止まれない" },
-  rush: { icon: "🎉", name: "団体客ラッシュ", dur: 20, msg: "団体客が来た! 提供ボーナス2倍" },
-  fire: { icon: "🔥", name: "コンロ火事", dur: 0, msg: "コンロが燃えた! 片付けよう" },
-  mouse: { icon: "🐭", name: "ネズミ", dur: 0, msg: "ネズミが食材を盗んだ!" },
-};
-let ev = null, evNext = 25, banner = { txt: "", t: 0 };
-const dark = document.createElement("canvas"); dark.width = 1200; dark.height = 800;
+<div id="ui">
+  <div class="scr" id="scr-home">
+    <h1>🍳 てんやわんやキッチン</h1>
+    <p style="margin:0;opacity:.85;text-align:center">キッチンで料理して、ホールで接客して、AIに教えて育てよう。<br>全100ステージ!</p>
+    <div id="homeStars" style="font-size:22px;color:#ffcc44"></div>
+    <button class="big" id="homeContinue">つづきから</button>
+    <button class="big sub" id="homeStart">ステージを選ぶ</button>
+  </div>
+  <div class="scr" id="scr-select">
+    <div class="row" style="width:100%;justify-content:space-between;align-items:center"><button class="big sub" id="selBack" style="min-width:0;padding:8px 14px;font-size:16px">← もどる</button><h2 id="worldName"></h2></div>
+    <div id="worldTabs"></div>
+    <div id="stageGrid"></div>
+    <div id="stageInfo"></div>
+    <div id="modePick"></div>
+    <button class="big" id="stageGo">スタート</button>
+  </div>
+  <div class="scr" id="scr-result">
+    <h2 id="resTitle"></h2>
+    <div class="stars" id="resStars"></div>
+    <div id="resScore" style="font-size:26px"></div>
+    <div id="resGoals" style="opacity:.8"></div>
+    <div id="resMsg" style="color:#9fe3b0;min-height:1.2em"></div>
+    <div class="row"><button class="big" id="resNext">次のステージ</button><button class="big sub" id="resRetry">もう一度</button><button class="big sub" id="resSelect">ステージ選択</button></div>
+  </div>
+  <div class="scr" id="scr-pause">
+    <h2>ポーズ中</h2>
+    <button class="big" id="pauseResume">つづける</button>
+    <button class="big sub" id="pauseQuit">ステージ選択にもどる</button>
+  </div>
+</div>
 
-const cv = document.getElementById("c"), ctx = cv.getContext("2d");
-let tableCount = 0;
-const newTable = () => ({ id: ++tableCount, state: "empty", t: 0, max: 1, ticket: null, pts: 0, who: "" });
-const tiles = MAP.map((r, y) => [...r].map((t, x) => ({ t, x, y, item: null, prog: 0, stove: "idle", dirty: 0, tb: t === "B" ? newTable() : null })));
-const keys = new Set();
-addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT") return;
-  keys.add(e.code);
-  if (state === "title") {
-    if (e.code === "Digit1") start(1);
-    if (e.code === "Digit2") start(2);
-    if (e.code === "Digit3") start(3);
-    if (e.code === "Digit4") start(4);
-    if (e.code === "Digit5") start(5);
-  } else if (state === "end" && e.code === "Enter") state = "title";
-  else if (state === "play") {
-    players.forEach(p => { if (p.keys && e.code === p.keys.act && !e.repeat) interact(p); });
-  }
-  if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
-});
-addEventListener("keyup", e => keys.delete(e.code));
-
-let spawnEvery = 16, selBot = 0;
-let state = "title", players = [], orders = [], score = 0, timeLeft = 0, spawnIn = 0, popups = [];
-let best = 0;
-try { best = +localStorage.getItem("ck-best") || 0; } catch {}
-
-function start(n) {
-  tiles.forEach(r => r.forEach(c => {
-    c.item = null; c.prog = 0; c.stove = "idle"; c.dirty = 0;
-    if (c.tb) Object.assign(c.tb, { state: "empty", t: 0, max: 1, ticket: null, pts: 0, who: "" });
-  }));
-  plates = START_PLATES;
-  players = [
-    { x: 3.5, y: 2.5, dir: [0, 1], item: null, col: "#e8504a",
-      keys: { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", act: "KeyE", chop: "KeyQ" } },
-  ];
-  if (n === 2) players.push({ x: 6.5, y: 2.5, dir: [0, 1], item: null, col: "#4a8be8",
-    keys: { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", act: "Period", chop: "Comma" } });
-  const nAi = n >= 3 ? n - 2 : 0;
-  for (let i = 0; i < nAi; i++) players.push(newBot(i));
-  spawnEvery = [20, 18, 15, 12][nAi];
-  aiUi.style.display = nAi ? "block" : "none";
-  if (nAi) {
-    selBot = 0; buildWho(); chatBox.innerHTML = "";
-    const known = Object.keys(recipes);
-    players.filter(p => p.ai).forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
-    chat("ai", "ヒント: 名前で指示(例「ポチ、ホールお願い」「タマ、キッチンお願い」)。「みんな、〜」で全員。");
-  }
-  orders = []; score = 0; ev = null; evNext = 25; banner.t = 0; timeLeft = gameTime; spawnIn = 0; popups = [];
-  state = "play";
-}
-
-const solid = (x, y) => x < 0 || y < 0 || x >= W || y >= H || tiles[y][x].t !== ".";
-const target = p => {
-  const tx = Math.floor(p.x + p.dir[0] * 0.8), ty = Math.floor(p.y + p.dir[1] * 0.8);
-  return tx < 0 || ty < 0 || tx >= W || ty >= H ? null : tiles[ty][tx];
-};
-const itemKey = i => i.type + ":" + i.state;
-const popup = (txt, x, y, col = "#fff") => popups.push({ txt, x, y, life: 1.2, col });
-
-function canAdd(plate, ing) {
-  return ing.kind === "ing" && ing.state !== "raw" && plate.contents.length < 2 &&
-    !plate.contents.some(c => c.type === ing.type);
-}
-
-function tableAct(p, c, h) {
-  const tb = c.tb;
-  if (!h) {
-    if (tb.state === "order") {
-      const r = RECIPES[Math.floor(Math.random() * RECIPES.length)];
-      const o = { r, t: orderLife, max: orderLife, table: tb.id, tile: c };
-      orders.push(o); tb.state = "wait"; tb.ticket = o; popup(`${tb.id}番 ${r.name}`, p.x, p.y, "#ffd66b");
-    } else if (tb.state === "pay") { score += tb.pts; popup("+" + tb.pts, p.x, p.y, "#7CFC7C"); tb.state = "dirty"; }
-    else if (tb.state === "dirty") { p.item = { kind: "dirty" }; tb.state = "empty"; }
-    return;
-  }
-  if (h.kind === "plate" && tb.state === "wait" && h.contents.length) {
-    if ([...tb.ticket.r.need].sort().join(",") === plateKey(h)) {
-      const o = tb.ticket; tb.pts = (20 + Math.floor(o.t / 5)) * (isEv("rush") ? 2 : 1);
-      orders.splice(orders.indexOf(o), 1); tb.ticket = null; tb.state = "eat"; tb.t = eatTime; tb.max = eatTime; p.item = null;
-      popup("いただきます!", p.x, p.y);
-    } else popup("注文と違う!", p.x, p.y, "#ff7777");
-  }
-}
-
-function interact(p) {
-  const c = target(p); if (!c) return;
-  const h = p.item;
-  if (c.t === "B") return tableAct(p, c, h);
-  if (c.t === "Z") { if (h && h.kind === "dirty" && c.dirty < 6) { c.dirty++; p.item = null; popup("シンクへ", p.x, p.y); } return; }
-  if (c.t === "P" && h) { if (h.kind === "plate" && !h.contents.length) { plates++; p.item = null; } return; }
-  if (!h) {
-    if (c.t === "T" || c.t === "L") p.item = { kind: "ing", type: c.t === "T" ? "tomato" : "lettuce", state: "raw" };
-    else if (c.t === "P") { if (plates > 0) { plates--; p.item = { kind: "plate", contents: [] }; } else popup("お皿がない!洗おう", p.x, p.y, "#ff7777"); }
-    else if (c.t === "S" && c.stove === "burnt") { c.stove = "idle"; c.prog = 0; popup("片付けた", p.x, p.y); }
-    else if (c.item) { p.item = c.item; c.item = null; c.prog = 0; }
-    return;
-  }
-  if (c.t === "X") { if (h.kind === "dirty") popup("洗ってね", p.x, p.y, "#ff7777"); else if (h.kind === "plate") h.contents = []; else p.item = null; return; }
-  if (c.t === "S") {
-    if (h.kind === "ing" && h.type === "tomato" && h.state === "chopped" && c.stove === "idle") {
-      c.stove = "cooking"; c.owner = p.ai ? p.name : null; c.prog = 0; p.item = null;
-    } else if (h.kind === "plate" && c.stove === "done" && canAdd(h, { kind: "ing", type: "tomato", state: "cooked" })) {
-      h.contents.push({ type: "tomato", state: "cooked" }); c.stove = "idle"; c.prog = 0;
-    }
-    return;
-  }
-  if (c.t === "C") {
-    if (!c.item && h.kind === "ing" && h.state === "raw") { c.item = h; h.owner = p.ai ? p.name : null; c.prog = 0; p.item = null; }
-    else if (c.item && c.item.state === "chopped" && h.kind === "plate" && canAdd(h, c.item)) {
-      h.contents.push(c.item); c.item = null;
-    }
-    return;
-  }
-  if (isCounter(c)) {
-    if (!c.item) { c.item = h; p.item = null; }
-    else if (c.item.kind === "plate" && canAdd(c.item, h)) { c.item.contents.push(h); p.item = null; }
-    else if (h.kind === "plate" && canAdd(h, c.item)) { h.contents.push(c.item); c.item = null; }
-  }
-}
-
-function update(dt) {
-  timeLeft -= dt;
-  if (timeLeft <= 0) {
-    state = "end";
-    if (score > best) { best = score; try { localStorage.setItem("ck-best", best); } catch {} }
-    return;
-  }
-  spawnIn -= dt;
-  if (banner.t > 0) banner.t -= dt;
-  evNext -= dt;
-  if (ev) { ev.t -= dt; if (ev.t <= 0) { ev = null; evNext = 15 + Math.random() * 10; } }
-  else if (evNext <= 0 && timeLeft > 12) startEvent();
-  const tbs = tiles.flat().filter(c => c.t === "B");
-  if (spawnIn <= 0) {
-    const nAi = players.filter(p => p.ai).length;
-    const busy = tbs.filter(c => c.tb.state !== "empty").length, free = tbs.filter(c => c.tb.state === "empty");
-    if (free.length && busy < 3 + nAi + (isEv("rush") ? 2 : 0)) {
-      const c = free[Math.floor(Math.random() * free.length)];
-      Object.assign(c.tb, { state: "order", t: tableOrderWait, max: tableOrderWait, ticket: null, who: CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)] });
-    }
-    spawnIn = isEv("rush") ? spawnEvery / 2 : spawnEvery;
-  }
-  for (const o of orders) o.t -= dt;
-  for (let i = orders.length - 1; i >= 0; i--) if (orders[i].t <= 0) {
-    const o = orders.splice(i, 1)[0]; score -= 10; popup("-10 待たせすぎ", o.tile.x + 0.5, o.tile.y + 0.5, "#ff7777");
-    o.tile.tb.state = "empty"; o.tile.tb.ticket = null;
-  }
-  for (const c of tbs) {
-    const tb = c.tb;
-    if (tb.state === "order") {
-      tb.t -= dt;
-      if (tb.t <= 0) { tb.state = "empty"; score -= 10; popup("-10 帰っちゃった", c.x + 0.5, c.y + 0.5, "#ff7777"); }
-    } else if (tb.state === "eat") {
-      tb.t -= dt; if (tb.t <= 0) { tb.state = "pay"; tb.t = payWait; tb.max = payWait; }
-    } else if (tb.state === "pay") {
-      tb.t -= dt; if (tb.t <= 0) { tb.state = "dirty"; popup("お会計されず…", c.x + 0.5, c.y + 0.5, "#ff7777"); }
-    }
-  }
-
-  for (const p of players) {
-    if (p.ai) {
-      botUpdate(p, dt);
-      work(p, target(p), p.chopping, dt);
-      continue;
-    }
-    let dx = (keys.has(p.keys.right) ? 1 : 0) - (keys.has(p.keys.left) ? 1 : 0);
-    let dy = (keys.has(p.keys.down) ? 1 : 0) - (keys.has(p.keys.up) ? 1 : 0);
-    if (!dx && !dy && p === players[0] && Math.hypot(joy.x, joy.y) > 0.3) { dx = joy.x; dy = joy.y; }
-    let tvx = 0, tvy = 0;
-    if (dx || dy) {
-      p.dir = Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
-      const l = Math.hypot(dx, dy); tvx = dx / l * 4.2 * speedMul; tvy = dy / l * 4.2 * speedMul;
-    }
-    if (isEv("slippery")) {
-      const k = Math.min(1, 2.2 * dt); p.vx = (p.vx || 0) + (tvx - (p.vx || 0)) * k; p.vy = (p.vy || 0) + (tvy - (p.vy || 0)) * k;
-    } else { p.vx = tvx; p.vy = tvy; }
-    if (p.vx || p.vy) moveBy(p, p.vx * dt, p.vy * dt);
-    work(p, target(p), keys.has(p.keys.chop) || (p === players[0] && touchChop), dt);
-  }
-  for (const row of tiles) for (const c of row) {
-    if (c.t !== "S") continue;
-    if (c.stove === "cooking" || c.stove === "done") {
-      c.prog += dt;
-      if (c.stove === "cooking" && c.prog >= cookTime) c.stove = "done";
-      if (c.prog >= burnTime) c.stove = "burnt";
-    }
-  }
-  popups.forEach(q => { q.life -= dt; q.y -= dt * 0.6; });
-  popups = popups.filter(q => q.life > 0);
-}
-
-const isEv = t => ev && ev.type === t;
-// 長押し作業: まな板で切る / シンクで洗う
-function work(p, c, on, dt) {
-  if (!c || !on) return;
-  if (c.t === "C" && c.item && c.item.state === "raw") { c.prog += dt; if (c.prog >= chopTime) { c.item.state = "chopped"; c.prog = 0; } }
-  else if (c.t === "Z" && c.dirty > 0) {
-    c.prog += dt;
-    if (c.prog >= washTime) { c.prog = 0; c.dirty--; plates++; popup("+お皿", p.x, p.y, "#9cf"); }
-  }
-}
-function startEvent() {
-  const type = Object.keys(EVENTS)[Math.floor(Math.random() * 5)], d = EVENTS[type];
-  banner = { txt: `${d.icon} ${d.msg}`, t: 3.5 };
-  if (d.dur) ev = { type, t: d.dur }; else evNext = 15 + Math.random() * 10;
-  if (type === "rush") spawnIn = 0;
-  if (type === "fire") {
-    const st = tiles.flat().filter(c => c.t === "S"); const c = st[Math.floor(Math.random() * st.length)];
-    c.stove = "burnt"; c.prog = 0;
-  }
-  if (type === "mouse") {
-    const cs = tiles.flat().filter(c => c.item && (isCounter(c) || c.t === "C"));
-    if (cs.length) cs[Math.floor(Math.random() * cs.length)].item = null; else banner.txt = "🐭 ネズミは何も盗めなかった";
-  }
-  const bots = players.filter(p => p.ai);
-  if (bots.length) { const b = bots[Math.floor(Math.random() * bots.length)]; b.say = { blackout: "真っ暗〜!", slippery: "うわ、滑る!", rush: "忙しくなるよ!", fire: "あちち!", mouse: "こらー!" }[type]; b.sayT = 2.5; }
-}
-
-function moveBy(p, dx, dy) {
-  const r = 0.3, free = (x, y) => ![[-r, -r], [r, -r], [-r, r], [r, r]].some(([a, b]) => solid(Math.floor(x + a), Math.floor(y + b)));
-  if (free(p.x + dx, p.y)) p.x += dx;
-  if (free(p.x, p.y + dy)) p.y += dy;
-}
-
-// ---- AI相棒(指示を聞いて動く・教えると料理を覚える) ----
-const chatBox = document.getElementById("chat"), chatIn = document.getElementById("chatIn");
-const aiUi = document.getElementById("aiUi");
-function chat(who, text, col) {
-  const d = document.createElement("div");
-  d.textContent = (who === "ai" ? "🤖 " : "🧑 ") + text;
-  d.style.color = who === "ai" ? (col || "#9ff0b0") : "#ddd";
-  chatBox.appendChild(d); chatBox.scrollTop = chatBox.scrollHeight;
-  while (chatBox.children.length > 60) chatBox.removeChild(chatBox.firstChild);
-}
-let recipes = {};
-try { recipes = JSON.parse(localStorage.getItem("ck-recipes") || "{}"); } catch {}
-const saveRecipes = () => { try { localStorage.setItem("ck-recipes", JSON.stringify(recipes)); } catch {} };
-const ING = { レタス: "lettuce", トマト: "tomato" };
-const ING_JA = { lettuce: "レタス", tomato: "トマト", plate: "お皿" };
-const dishOf = plate => {
-  const k = plate.contents.map(itemKey).sort().join(",");
-  return RECIPES.find(r => [...r.need].sort().join(",") === k);
-};
-
-function say(b, text) { b.say = text; b.sayT = 3.5; chat("ai", `${b.name}: ${text}`, b.col); }
-
-// 人間の言葉 → 手順。skill: get/board/chop/grab/stove/plateAdd/deliver/trash/drop
-function parse(raw) {
-  const s = raw.replace(/\s/g, "");
-  const ing = /レタス/.test(s) ? "lettuce" : /トマト/.test(s) ? "tomato" : null;
-  const st = (skill, a) => ({ skill, a, src: "user" });
-  if (/待って|止ま|ストップ|やめ|キャンセル/.test(s)) return { cmd: "stop" };
-  const tm = s.match(/([1-6])番/), tid = tm ? +tm[1] : null;
-  if (/(ホール|接客)/.test(s) && /(担当|お願い|頼|やって|任せ)/.test(s)) return { cmd: "role", role: "hall" };
-  if (/(キッチン|厨房|調理)/.test(s) && /(担当|お願い|頼|やって|任せ)/.test(s)) return { cmd: "role", role: "kitchen" };
-  if (/おまかせ|任せ|自由に|自動/.test(s)) return { cmd: "auto" };
-  if (/ヒント|どうやる|使い方|何ができる|覚えた/.test(s)) return { cmd: "help" };
-  const dish = RECIPES.find(r => s.includes(r.name));
-  if (dish && /作/.test(s)) return { cmd: "make", dish };
-  if (/注文(を)?(取|とって|聞)|オーダー/.test(s)) return { steps: [st("order", tid)] };
-  if (/会計|レジ|支払/.test(s)) return { steps: [st("pay", tid)] };
-  if (/片付|下げ|さげ/.test(s)) return { steps: [st("clear", tid)] };
-  if (/洗/.test(s)) return { steps: [st("sink"), st("wash")] };
-  if (/運|届け|サーブ|配膳|持って行|持っていっ/.test(s)) return { steps: [st("fetch"), st("serve", tid)] };
-  if (/提供|出して|だして|パス|受け渡/.test(s)) return { steps: [st("deliver")] };
-  if (/捨て|すてて|ごみ/.test(s)) return { steps: [st("trash")] };
-  if (/皿に|盛|乗せ|のせ|添え/.test(s)) return { steps: [st("plateAdd", ing)] };
-  if (/切った|刻んだ|きざんだ/.test(s) && ing) {
-    return { steps: /コンロ|煮/.test(s) ? [st("grab", ing), st("stove")] : [st("grab", ing)] };
-  }
-  if (/コンロ|煮|ゆで|加熱/.test(s)) return { steps: [st("stove")] };
-  if (/切|刻/.test(s)) return { steps: ing ? [st("get", ing), st("board"), st("chop", ing)] : [st("chop")] };
-  if (/まな板/.test(s)) return { steps: [st("board")] };
-  if (/置い|おいて/.test(s)) return { steps: [st("drop")] };
-  if (/皿|さら/.test(s)) return { steps: [st("get", "plate")] };
-  if (ing) return { steps: [st("get", ing)] };
-  return null;
-}
-
-const STEP_SAY = {
-  get: a => `${ING_JA[a]}を取ってくるね`, board: () => "まな板に置くね", chop: () => "切るよ〜",
-  grab: a => `切った${ING_JA[a]}を持つね`, stove: () => "コンロに入れるね",
-  plateAdd: a => `${a ? ING_JA[a] + "を" : ""}お皿に盛るね`, deliver: () => "受け渡し台に出すね",
-  trash: () => "捨てるね", drop: () => "ここに置いとくね",
-  order: () => "ご注文をうかがいます!", pay: () => "お会計しますね", clear: () => "お皿を下げるね", serve: () => "お待たせしました〜!",
-  fetch: () => "料理を取ってくるね", sink: () => "シンクに入れるね", wash: () => "洗うよ〜", putback: () => "お皿を戻すね",
-};
-
-const BOTS = [{ name: "ポチ", col: "#3fae5a", at: [6.5, 2.5] }, { name: "タマ", col: "#d98a1f", at: [10.5, 3.5] }, { name: "コタ", col: "#9a5ad9", at: [5.5, 6.5] }];
-function buildWho() {
-  const w = document.getElementById("who"); w.innerHTML = "";
-  players.filter(p => p.ai).forEach((b, i) => {
-    const btn = document.createElement("button"); btn.type = "button"; btn.textContent = "🤖" + b.name;
-    btn.style.background = b.col; btn.className = i === selBot ? "sel" : "";
-    btn.onclick = () => { selBot = i; buildWho(); }; w.appendChild(btn);
-  });
-}
-function sendCmd(text) {
-  text = text.trim(); if (!text || state !== "play") return;
-  chat("you", text);
-  const bots = players.filter(p => p.ai);
-  if (!bots.length) return;
-  let targets = [bots[Math.min(selBot, bots.length - 1)]];
-  if (/みんな|全員|ぜんいん/.test(text)) { targets = bots; text = text.replace(/みんな|全員|ぜんいん/g, ""); }
-  else {
-    const named = bots.filter(b => text.includes(b.name));
-    if (named.length) { targets = named; selBot = bots.indexOf(named[0]); buildWho(); named.forEach(b => text = text.split(b.name).join("")); }
-  }
-  const r = parse(text);
-  for (const b of targets) runCmd(b, r);
-}
-function runCmd(b, r) {
-  if (!r) { say(b, "ごめん、よくわからない…「レタスを取って」みたいに教えて!"); return; }
-  if (r.cmd === "stop") { b.queue = []; b.cur = null; b.chopping = false; b.auto = false; b.role = null; b.log = []; say(b, "OK、止まるね。"); return; }
-  if (r.cmd === "role") {
-    b.auto = true; b.fails = 0; b.role = r.role;
-    say(b, r.role === "hall" ? "ホール担当するね! 注文・配膳・お会計・片付けをやるよ。" : "キッチン担当するね! 覚えた料理を作るよ。"); return;
-  }
-  if (r.cmd === "auto") {
-    b.auto = true; b.fails = 0; b.role = "any";
-    say(b, Object.keys(recipes).length ? "おまかせあれ! 覚えた料理で注文をさばくよ。" : "まだ料理を覚えてないよ…先に教えてね!");
-    return;
-  }
-  if (r.cmd === "help") {
-    const k = Object.keys(recipes);
-    say(b, k.length ? `覚えた料理: ${k.join("、")}。「◯◯作って」か「おまかせ」で動くよ。` :
-      "まだ何も覚えてない。手順を教えて提供まで成功すると覚えるよ。");
-    return;
-  }
-  if (r.cmd === "make") {
-    const rec = recipes[r.dish.name];
-    if (!rec) { say(b, `${r.dish.name}の作り方、まだ知らないの。一つずつ教えて!`); return; }
-    rec.forEach(s => b.queue.push({ ...s, src: "auto" }));
-    say(b, `了解、${r.dish.name}作るね!`); return;
-  }
-  r.steps.forEach(s => b.queue.push({ ...s }));
-}
-
-function newBot(i) {
-  const d = BOTS[i];
-  return { x: d.at[0], y: d.at[1], dir: [0, 1], item: null, col: d.col, name: d.name, ai: true, queue: [], cur: null, wait: 0,
-    chopping: false, log: [], auto: false, role: null, fails: 0, say: "", sayT: 0, idleSay: 0, job: null, claim: null };
-}
-
-// 幅優先探索: 床マスだけを歩く
-function bfs(sx, sy) {
-  const dist = new Map([[sx + "," + sy, { d: 0, from: null }]]);
-  const q = [[sx, sy]];
-  for (let i = 0; i < q.length; i++) {
-    const [x, y] = q[i], d = dist.get(x + "," + y).d;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy, k = nx + "," + ny;
-      if (solid(nx, ny) || dist.has(k)) continue;
-      dist.set(k, { d: d + 1, from: x + "," + y }); q.push([nx, ny]);
-    }
-  }
-  return dist;
-}
-// 条件に合うマスのうち一番近いもの → { tx, ty, stand:[x,y] }
-function nearest(b, pred) {
-  const dist = bfs(Math.floor(b.x), Math.floor(b.y));
-  let best = null;
-  for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
-    if (!pred(tiles[ty][tx])) continue;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const k = (tx + dx) + "," + (ty + dy), n = dist.get(k);
-      if (n && (!best || n.d < best.d)) best = { d: n.d, tx, ty, stand: [tx + dx, ty + dy], dist };
-    }
-  }
-  return best;
-}
-const pathTo = (dist, stand) => {
-  const out = []; let k = stand[0] + "," + stand[1];
-  while (k) { const n = dist.get(k); out.unshift(k.split(",").map(Number)); k = n.from; }
-  return out.slice(1);
-};
-
-// 手順ごとに「どのマスで何をするか」を決める。{fail}=できない {wait}=待つ
-function plan(b, s) {
-  const h = b.item, F = m => ({ fail: m }), go = (pred, act = "interact") => {
-    const n = nearest(b, pred); return n ? { n, act } : null;
-  };
-  let r;
-  switch (s.skill) {
-    case "get":
-      if (h) return F("手がふさがってるよ");
-      if (s.a === "plate" && plates <= 0) return F("お皿がないよ。洗わなきゃ!");
-      r = go(c => c.t === { tomato: "T", lettuce: "L", plate: "P" }[s.a]);
-      return r || F("それが見つからない…");
-    case "board":
-      if (!h || h.kind !== "ing" || h.state !== "raw") return F("切る食材を持ってないよ");
-      return go(c => c.t === "C" && !c.item) || { wait: true };
-    case "chop":
-      return go(c => c.t === "C" && c.item && c.item.state === "raw" && (!c.item.owner || c.item.owner === b.name) && (!s.a || c.item.type === s.a), "chop") || F("切るものがまな板にないよ");
-    case "grab":
-      if (h) return F("手がふさがってるよ");
-      return go(c => c.t === "C" && c.item && c.item.state === "chopped" && (!c.item.owner || c.item.owner === b.name) && c.item.type === s.a) || F(`切った${ING_JA[s.a]}がないよ`);
-    case "stove":
-      if (!h || h.kind !== "ing" || h.type !== "tomato" || h.state !== "chopped") return F("切ったトマトを持ってないよ");
-      return go(c => c.t === "S" && c.stove === "idle") || { wait: true };
-    case "plateAdd": {
-      if (!h || h.kind !== "plate") return F("お皿を持ってないよ");
-      r = go(c => (c.t === "C" && c.item && c.item.state === "chopped" && (!c.item.owner || c.item.owner === b.name) && canAdd(h, c.item) && (!s.a || c.item.type === s.a)) ||
-        (c.t === "S" && c.stove === "done" && (!c.owner || c.owner === b.name) && canAdd(h, { kind: "ing", type: "tomato", state: "cooked" }) && (!s.a || s.a === "tomato")));
-      if (r) return r;
-      if (tiles.some(row => row.some(c => c.t === "S" && c.stove === "cooking")) && (!s.a || s.a === "tomato")) return { wait: true };
-      return F("盛れるものがないよ");
-    }
-    case "deliver":
-      if (!h || h.kind !== "plate" || !h.contents.length) return F("提供できるお皿がないよ");
-      return go(c => c.t === "K" && !c.item) || { wait: true };
-    case "order":
-      if (h) return F("手がふさがってるよ");
-      return go(c => c.t === "B" && c.tb.state === "order" && (!s.a || c.tb.id === s.a)) || F("注文待ちのお客さんがいないよ");
-    case "pay":
-      if (h) return F("手がふさがってるよ");
-      return go(c => c.t === "B" && c.tb.state === "pay" && (!s.a || c.tb.id === s.a)) || F("お会計待ちのお客さんがいないよ");
-    case "clear":
-      if (h) return F("手がふさがってるよ");
-      return go(c => c.t === "B" && c.tb.state === "dirty" && (!s.a || c.tb.id === s.a)) || F("片付けるテーブルがないよ");
-    case "serve":
-      if (!h || h.kind !== "plate" || !h.contents.length) return F("運べる料理を持ってないよ");
-      return go(c => c.t === "B" && c.tb.state === "wait" && [...c.tb.ticket.r.need].sort().join(",") === plateKey(h) && (!s.a || c.tb.id === s.a)) ||
-        F("この料理を待ってるお客さんがいないよ");
-    case "fetch":
-      if (h) return h.kind === "plate" && h.contents.length ? { skip: true } : F("手がふさがってるよ");
-      return go(c => isCounter(c) && c.item && c.item.kind === "plate" && c.item.contents.length && (!s.a || plateKey(c.item) === s.a)) || F("出来上がった料理が見つからないよ");
-    case "sink":
-      if (!h || h.kind !== "dirty") return { skip: true };
-      return go(c => c.t === "Z" && c.dirty < 6) || { wait: true };
-    case "wash":
-      return go(c => c.t === "Z" && c.dirty > 0, "chop") || F("洗うお皿がないよ");
-    case "putback":
-      return h && h.kind === "plate" && !h.contents.length ? go(c => c.t === "P") : { skip: true };
-    case "trash":
-      return h ? go(c => c.t === "X") : F("何も持ってないよ");
-    case "drop":
-      return h ? (go(c => isCounter(c) && !c.item) || F("置き場所がないよ")) : F("何も持ってないよ");
-  }
-  return F("その作業はできないよ");
-}
-
-function failStep(b, msg) {
-  say(b, msg); b.queue = []; b.cur = null; b.chopping = false; b.log = [];
-  if (b.auto && ++b.fails >= 3) { b.auto = false; say(b, "うまくいかないから、おまかせは終わりにするね。"); }
-  b.wait = 3;
-}
-
-function botUpdate(b, dt) {
-  b.sayT -= dt;
-  if (b.wait > 0) { b.wait -= dt; return; }
-  if (!b.cur) {
-    const s = b.queue.shift();
-    if (!s) { autoPick(b, dt); return; }
-    b.cur = { s, phase: "plan", t: 0 };
-    if (s.src === "user" || b.queue.length === 0) b.sayT = 0;
-    if (s.src === "user") say(b, STEP_SAY[s.skill](s.a));
-  }
-  const c = b.cur; c.t += dt;
-  if (c.phase === "plan") {
-    const r = plan(b, c.s);
-    if (r.fail) return failStep(b, r.fail);
-    if (r.skip) { b.cur = null; return; }
-    if (r.wait) { if (c.t > 14) return failStep(b, "待ってたけど、できなかったよ…"); b.wait = 0.4; return; }
-    c.n = r.n; c.act = r.act; c.path = pathTo(r.n.dist, r.n.stand); c.phase = "walk";
-  }
-  if (c.phase === "walk") {
-    const wp = c.path[0];
-    if (!wp) { c.phase = "act"; c.t = 0; b.dir = [c.n.tx - Math.floor(b.x), c.n.ty - Math.floor(b.y)]; return; }
-    const tx = wp[0] + 0.5, ty = wp[1] + 0.5, ex = tx - b.x, ey = ty - b.y, sp = 4 * dt * speedMul * aiMul;
-    if (Math.abs(ex) > 0.04) { b.dir = [Math.sign(ex), 0]; moveBy(b, Math.sign(ex) * Math.min(sp, Math.abs(ex)), 0); }
-    else if (Math.abs(ey) > 0.04) { b.dir = [0, Math.sign(ey)]; moveBy(b, 0, Math.sign(ey) * Math.min(sp, Math.abs(ey))); }
-    else { b.x = tx; b.y = ty; c.path.shift(); }
-    return;
-  }
-  if (c.phase === "act") {
-    if (c.t < 0.25) return;
-    const r = plan(b, c.s);                       // 到着までに状況が変わっていないか確認
-    if (r.fail) return failStep(b, r.fail);
-    if (r.skip) { b.cur = null; return; }
-    if (r.wait) { b.wait = 0.4; return; }
-    if (r.n.tx !== c.n.tx || r.n.ty !== c.n.ty) { c.phase = "plan"; return; }
-    if (c.act === "chop") { b.chopping = true; c.phase = "chop"; c.t = 0; return; }
-    const before = b.item;
-    let learned = null;
-    if (c.s.skill === "deliver") learned = dishOf(before);
-    interact(b);
-    if (c.s.skill === "deliver" && b.item === null) {
-      b.fails = 0;
-      if (learned && !recipes[learned.name] && b.log.length) {
-        recipes[learned.name] = b.log.map(x => ({ skill: x.skill, a: x.a })); saveRecipes();
-        say(b, `${learned.name}、覚えた! 次からは「${learned.name}作って」でいいよ。`);
-      }
-      b.log = [];
-    } else if (c.s.src === "user") b.log.push(c.s);
-    if (c.s.skill === "trash") b.log = [];
-    b.cur = null; b.wait = 0.25;
-    return;
-  }
-  if (c.phase === "chop") {
-    const tile = tiles[c.n.ty][c.n.tx];
-    const finished = tile.t === "Z" ? (tile.dirty === 0 || c.t > 25) : (!tile.item || tile.item.state !== "raw" || c.t > 6);
-    if (finished) {
-      b.chopping = false; if (c.s.src === "user") b.log.push(c.s);
-      b.cur = null; b.wait = 0.25;
-    }
-  }
-}
-
-// 手が空いたら、覚えた料理で注文をさばく(おまかせモード)
-const tableTiles = () => tiles.flat().filter(c => c.t === "B");
-const claimedByOther = (b, c) => players.some(q => q.ai && q !== b && q.claim === c);
-const auto = (...steps) => steps.map(([skill, a]) => ({ skill, a, src: "auto" }));
-
-// 手に何か持ったままのとき(失敗の後など)は、まず片付ける
-function autoHeld(b) {
-  const h = b.item; if (!h) return false;
-  if (h.kind === "plate" && h.contents.length) {
-    const key = plateKey(h);
-    const t = tableTiles().find(c => c.tb.state === "wait" && [...c.tb.ticket.r.need].sort().join(",") === key && !claimedByOther(b, c));
-    if (t && b.role !== "kitchen") { b.claim = t; b.queue.push(...auto(["serve", t.tb.id])); }
-    else b.queue.push(...auto(["deliver"]));
-  } else if (h.kind === "plate") b.queue.push(...auto(["putback"]));
-  else if (h.kind === "dirty") b.queue.push(...auto(["sink"], ["wash"]));
-  else b.queue.push(...auto(["trash"]));
-  return true;
-}
-
-// ホール担当: お会計 > 配膳 > 注文取り > 片付け・洗い物
-function autoHall(b) {
-  const tbs = tableTiles().filter(c => !claimedByOther(b, c));
-  const t1 = tbs.find(c => c.tb.state === "pay");
-  if (t1) { b.claim = t1; b.queue.push(...auto(["pay", t1.tb.id])); return true; }
-  const ready = tiles.flat().filter(c => isCounter(c) && c.item && c.item.kind === "plate" && c.item.contents.length);
-  for (const c of ready) {
-    const key = plateKey(c.item);
-    const t = tbs.find(x => x.tb.state === "wait" && [...x.tb.ticket.r.need].sort().join(",") === key);
-    if (t) { b.claim = t; b.queue.push(...auto(["fetch", key], ["serve", t.tb.id])); return true; }
-  }
-  const t3 = tbs.find(c => c.tb.state === "order");
-  if (t3) { b.claim = t3; b.queue.push(...auto(["order", t3.tb.id])); return true; }
-  const t4 = tbs.find(c => c.tb.state === "dirty");
-  if (t4) { b.claim = t4; b.queue.push(...auto(["clear", t4.tb.id], ["sink"], ["wash"])); return true; }
-  const sink = tiles.flat().find(c => c.t === "Z" && c.dirty > 0);
-  if (sink && !claimedByOther(b, sink)) { b.claim = sink; b.queue.push(...auto(["wash"])); return true; }
-  return false;
-}
-
-// キッチン担当: 覚えた料理で、まだ作られていない注文を作る
-function autoKitchen(b) {
-  const prepared = [];
-  tiles.flat().forEach(c => { if (isCounter(c) && c.item && c.item.kind === "plate" && c.item.contents.length) prepared.push(plateKey(c.item)); });
-  players.forEach(q => { if (q.item && q.item.kind === "plate" && q.item.contents.length) prepared.push(plateKey(q.item)); });
-  for (const o of [...orders].sort((x, y) => x.t - y.t)) {
-    if (!recipes[o.r.name] || players.some(q => q.ai && q.job === o)) continue;
-    const i = prepared.indexOf([...o.r.need].sort().join(","));
-    if (i >= 0) { prepared.splice(i, 1); continue; }
-    b.job = o; say(b, `${o.r.name}、作るね!`);
-    recipes[o.r.name].forEach(st => b.queue.push({ ...st, src: "auto" }));
-    return true;
-  }
-  return false;
-}
-
-// おまかせ/担当モード: 手が空いたら自分で仕事を探す
-function autoPick(b, dt) {
-  if (!b.auto) return;
-  b.job = null; b.claim = null;
-  if (autoHeld(b)) return;
-  const role = b.role || "any";
-  if (role !== "kitchen" && autoHall(b)) return;
-  if (role !== "hall" && autoKitchen(b)) return;
-  b.idleSay -= dt;
-  if (b.idleSay <= 0) {
-    b.idleSay = 15;
-    if (role !== "hall" && orders.some(o => !recipes[o.r.name])) say(b, "作り方を知らない注文があるよ…教えて!");
-    else say(b, "お客さん待ちだよ。");
-  }
-}
-
-// ---- 描画 ----
-const COL = { "#": "#c9a36b", T: "#a8744a", L: "#a8744a", C: "#d9c08c", S: "#555", P: "#e9e9e9", D: "#7bc47b", X: "#777", ".": "#f1e6c8", B: "#f1e6c8", K: "#e0b36b", Z: "#9fcbe5", E: "#7a5a3a" };
-function txt(s, x, y, size = 28, align = "center", col = "#fff") {
-  ctx.font = `bold ${size}px system-ui,sans-serif`; ctx.textAlign = align; ctx.textBaseline = "middle";
-  ctx.fillStyle = col; ctx.fillText(s, x, y);
-}
-function drawItem(it, x, y, s = 1) {
-  if (!it) return;
-  if (it.kind === "dirty") {
-    ctx.fillStyle = "#bfa98a"; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 20 * s, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#8a7656"; ctx.stroke(); txt("💧", x + 12 * s, y - 8 * s, 16 * s); return;
-  }
-  if (it.kind === "plate") {
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(x, y, 26 * s, 20 * s, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#999"; ctx.stroke();
-    it.contents.forEach((c, i) => drawItem({ kind: "ing", ...c }, x + (i ? 12 : -12) * s, y, 0.6 * s));
-    return;
-  }
-  ctx.font = `${34 * s}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(EMOJI[it.type], x, y);
-  if (it.state !== "raw") txt(it.state === "chopped" ? "✂" : "♨", x + 16 * s, y + 14 * s, 18 * s);
-}
-function draw() {
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.save();
-  ctx.scale(0.8, 0.8);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = tiles[y][x], px = x * T, py = y * T;
-    ctx.fillStyle = (c.t === "." || c.t === "B") && x >= 9 ? "#e8d3b5" : COL[c.t]; ctx.fillRect(px, py, T, T);
-    ctx.strokeStyle = "rgba(0,0,0,.08)"; ctx.strokeRect(px, py, T, T);
-    const cx = px + T / 2, cy = py + T / 2;
-    if (c.t === "T") txt("🍅", cx, cy, 36);
-    if (c.t === "L") txt("🥬", cx, cy, 36);
-    if (c.t === "P") { txt("🍽", cx, cy - 6, 34); txt(`×${plates}`, cx, py + T - 14, 18, "center", plates ? "#333" : "#d33"); }
-    if (c.t === "K" && !c.item) txt("受渡", cx, cy, 16, "center", "#8a5a1a");
-    if (c.t === "E") txt("🚪", cx, cy, 36);
-    if (c.t === "Z") {
-      txt("🚰", cx, cy - 6, 34); if (c.dirty) txt(`🍽×${c.dirty}`, cx, py + T - 14, 16, "center", "#234");
-      if (c.prog > 0 && c.dirty) bar(px, py, c.prog / washTime, "#3a8bd8");
-    }
-    if (c.t === "B") drawTable(c, px, py, cx, cy);
-    if (c.t === "X") txt("🗑", cx, cy, 34);
-    if (c.t === "C") txt("🔪", cx, cy + 22, 16);
-    if (c.t === "S") {
-      ctx.fillStyle = c.stove === "burnt" ? "#222" : "#999"; ctx.beginPath(); ctx.arc(cx, cy, 28, 0, 7); ctx.fill();
-      if (c.stove === "cooking") txt("🍅♨", cx, cy, 22);
-      if (c.stove === "done") txt("🍲", cx, cy, 34);
-      if (c.stove === "burnt") txt("🔥", cx, cy, 34);
-      if (c.stove === "cooking" || c.stove === "done") bar(px, py, Math.min(1, c.prog / cookTime), c.stove === "done" ? "#ff9a3c" : "#7CFC7C");
-    }
-    if (c.item) {
-      drawItem(c.item, cx, cy - 4);
-      if (c.t === "C" && c.prog > 0) bar(px, py, c.prog / chopTime, "#7CFC7C");
-    }
-  }
-  for (const p of players) {
-    const px = p.x * T, py = p.y * T;
-    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(px, py, 24, 0, 7); ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(px + p.dir[0] * 12 - 6, py + p.dir[1] * 12 - 4, 5, 0, 7);
-    ctx.arc(px + p.dir[0] * 12 + 8, py + p.dir[1] * 12 - 4, 5, 0, 7); ctx.fill();
-    if (p.item) drawItem(p.item, px + p.dir[0] * 34, py + p.dir[1] * 34, 0.9);
-    if (p.ai) {
-      txt("🤖" + p.name, px, py - 38, 16, "center", p.col);
-      if (p.sayT > 0 && p.say) {
-        ctx.font = "bold 16px system-ui,sans-serif";
-        const w = Math.min(ctx.measureText(p.say).width + 16, 440), bx = Math.max(4, Math.min(W * T - w - 4, px - w / 2));
-        ctx.fillStyle = "#fffe"; ctx.fillRect(bx, py - 82, w, 30);
-        txt(p.say.length > 28 ? p.say.slice(0, 27) + "…" : p.say, bx + w / 2, py - 67, 16, "center", "#222");
-      }
-    }
-  }
-  if (isEv("blackout") && state === "play") {
-    const dc = dark.getContext("2d");
-    dc.globalCompositeOperation = "source-over"; dc.fillStyle = "rgba(0,0,0,.9)"; dc.fillRect(0, 0, W * T, H * T);
-    dc.globalCompositeOperation = "destination-out";
-    for (const p of players) {
-      const g = dc.createRadialGradient(p.x * T, p.y * T, 20, p.x * T, p.y * T, 130);
-      g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
-      dc.fillStyle = g; dc.fillRect(p.x * T - 130, p.y * T - 130, 260, 260);
-    }
-    ctx.drawImage(dark, 0, 0);
-  }
-  for (const q of popups) txt(q.txt, q.x * T, q.y * T, 26, "center", q.col);
-  ctx.restore();
-  // HUD
-  txt(`スコア ${score}`, 100, 680, 32, "center");
-  txt(`のこり ${Math.max(0, Math.ceil(timeLeft))}秒`, 275, 680, 32, "center", timeLeft < 20 ? "#ff7777" : "#fff");
-  const on = orders.length, cw = Math.min(138, Math.floor(572 / Math.max(1, on)) - 6);
-  orders.forEach((o, i) => {
-    const x = 388 + i * (cw + 6);
-    ctx.fillStyle = o.t < 12 ? "#a33" : "#2a2a2a"; ctx.fillRect(x, 644, cw, 72);
-    txt(`${o.table}番 ${o.r.name}`, x + cw / 2, 660, cw < 120 ? 13 : 16);
-    txt(o.r.need.map(k => EMOJI[k.split(":")[0]] + (k.endsWith("cooked") ? "♨" : "✂")).join(" "), x + cw / 2, 686, 22);
-    ctx.fillStyle = "#7CFC7C"; ctx.fillRect(x, 708, cw * Math.max(0, o.t / o.max), 8);
-  });
-  if (ev && state === "play") {
-    const d = EVENTS[ev.type], label = `${d.icon} ${d.name} ${Math.ceil(ev.t)}秒`;
-    ctx.fillStyle = "#000a"; ctx.fillRect(330, 4, 300, 34); txt(label, 480, 21, 22, "center", "#ffd66b");
-  }
-  if (banner.t > 0 && state === "play") {
-    ctx.fillStyle = "#000c"; ctx.fillRect(120, 270, 720, 80); txt(banner.txt, 480, 310, 34, "center", "#ffd66b");
-  }
-  if (state !== "play") {
-    ctx.fillStyle = "rgba(0,0,0,.72)"; ctx.fillRect(0, 0, cv.width, cv.height);
-    if (state === "title") {
-      txt("🍳 てんやわんやキッチン", 480, 190, 54);
-      txt("キッチンで料理 → ホールで接客 のレストラン", 480, 262, 26);
-      txt("①注文を取る ②料理を作って受け渡し台へ ③席に運ぶ ④お会計 ⑤皿を下げて洗う", 480, 306, 19);
-      txt("お皿は数に限りがある! 洗わないと足りなくなるよ。コンロは放置すると焦げる", 480, 340, 19);
-      txt("下のボタン(数字キー1〜5も可)で開始", 480, 430, 30, "center", "#ffd66b");
-      txt("AIに日本語で指示して手順を教えよう。覚えた料理は全員で共有・保存されます", 480, 480, 18);
-      txt(`ベストスコア ${best}`, 480, 530, 22);
-    } else {
-      txt("タイムアップ!", 480, 220, 54);
-      txt(`スコア ${score}${score >= best && score > 0 ? "  🎉ベスト更新" : ""}`, 480, 310, 40);
-      txt("Enter / タップ でタイトルへ", 480, 410, 26, "center", "#ffd66b");
-    }
-  }
-}
-function drawTable(c, px, py, cx, cy) {
-  const tb = c.tb;
-  ctx.fillStyle = "#b07a45"; ctx.fillRect(px + 8, py + 8, T - 16, T - 16);
-  ctx.strokeStyle = "#7a4f28"; ctx.strokeRect(px + 8, py + 8, T - 16, T - 16);
-  txt(String(tb.id), px + 14, py + 14, 14, "center", "#fff");
-  if (tb.state === "order") { txt(tb.who, cx, cy + 2, 38); txt("💬", cx + 22, py + 12, 22); bar(px, py, tb.t / tb.max, "#ffb23c"); }
-  else if (tb.state === "wait") {
-    txt(tb.who, cx, cy + 6, 34);
-    txt(tb.ticket.r.need.map(k => EMOJI[k.split(":")[0]] + (k.endsWith("cooked") ? "♨" : "✂")).join(""), cx, py + 12, 16);
-    bar(px, py, Math.max(0, tb.ticket.t / tb.ticket.max), tb.ticket.t < 15 ? "#e8504a" : "#7CFC7C");
-  } else if (tb.state === "eat") { txt("😋", cx, cy - 6, 30); txt("🍽", cx, cy + 20, 26); bar(px, py, 1 - tb.t / tb.max, "#9cf"); }
-  else if (tb.state === "pay") { txt(tb.who, cx - 10, cy + 6, 30); txt("💰", cx + 16, cy - 8, 30); bar(px, py, tb.t / tb.max, "#ffb23c"); }
-  else if (tb.state === "dirty") drawItem({ kind: "dirty" }, cx, cy);
-}
-function bar(px, py, f, col) {
-  ctx.fillStyle = "#0006"; ctx.fillRect(px + 8, py + T - 12, T - 16, 7);
-  ctx.fillStyle = col; ctx.fillRect(px + 8, py + T - 12, (T - 16) * f, 7);
-}
-
-const CHIPS = ["レタスを取って", "まな板に置いて", "切って", "皿を取って", "レタスを皿に", "提供して",
-  "トマトを切って", "切ったトマトをコンロに入れて", "トマトを皿に", "注文を取って", "運んで", "お会計して", "片付けて", "洗って", "サラダ作って", "トマトスープ作って", "ホールお願い", "キッチンお願い", "おまかせ", "待って", "ヒント"];
-CHIPS.forEach(t => {
-  const b = document.createElement("button"); b.type = "button"; b.textContent = t;
-  b.onclick = () => sendCmd(t); document.getElementById("chips").appendChild(b);
-});
-document.getElementById("chatForm").onsubmit = e => { e.preventDefault(); sendCmd(chatIn.value); chatIn.value = ""; };
-chatIn.addEventListener("focus", () => keys.clear());
-
-// ---- スマホ操作 ----
-let joy = { x: 0, y: 0 }, touchChop = false;
-const $ = id => document.getElementById(id), pad = $("pad"), knob = $("knob");
-function padMove(e) {
-  const r = pad.getBoundingClientRect(), m = r.width / 2 * 0.8;
-  let vx = e.clientX - (r.left + r.width / 2), vy = e.clientY - (r.top + r.height / 2);
-  const l = Math.hypot(vx, vy); if (l > m) { vx *= m / l; vy *= m / l; }
-  knob.style.transform = `translate(${vx}px,${vy}px)`; joy.x = vx / m; joy.y = vy / m;
-}
-const padEnd = () => { joy.x = joy.y = 0; knob.style.transform = ""; };
-pad.addEventListener("pointerdown", e => { pad.setPointerCapture(e.pointerId); padMove(e); });
-pad.addEventListener("pointermove", e => { if (pad.hasPointerCapture(e.pointerId)) padMove(e); });
-["pointerup", "pointercancel"].forEach(t => pad.addEventListener(t, padEnd));
-$("actBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "play" && players[0]) interact(players[0]); });
-const chopBtn = $("chopBtn");
-chopBtn.addEventListener("pointerdown", e => { e.preventDefault(); chopBtn.setPointerCapture(e.pointerId); touchChop = true; });
-["pointerup", "pointercancel"].forEach(t => chopBtn.addEventListener(t, () => { touchChop = false; }));
-document.querySelectorAll("#menu button[data-n]").forEach(b => b.onclick = () => start(+b.dataset.n));
-cv.addEventListener("pointerdown", () => { if (state === "end") state = "title"; });
-let shownState = "";
-function syncUi() {
-  if (shownState === state) return; shownState = state;
-  $("menu").style.display = state === "title" ? "flex" : "none";
-  $("touch").style.display = state === "play" && matchMedia("(pointer:coarse)").matches ? "flex" : "none";
-  if (state !== "play") { joy.x = joy.y = 0; touchChop = false; }
-}
-
-let last = performance.now();
-(function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (state === "play") update(dt);
-  draw();
-  syncUi();
-  requestAnimationFrame(loop);
-})(last);
-</script>
+<script src="js/data.js"></script>
+<script src="js/calibration.js"></script>
+<script src="js/stages.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
