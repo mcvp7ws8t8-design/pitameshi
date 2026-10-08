@@ -374,7 +374,7 @@ function navMove(dx, dy) {
 function navBack() {
   if (paused) { setPause(false); return; }
   const scr = [...document.querySelectorAll("#ui .scr")].find(e => e.style.display !== "none"); if (!scr) return;
-  if (scr.id === "scr-select") $("selBack").click(); else if (scr.id === "scr-result") $("resSelect").click();
+  if (scr.id === "scr-select") $("selBack").click(); else if (scr.id === "scr-result") $("resSelect").click(); else if (scr.id === "scr-help") $("helpBack").click(); else if (scr.id === "scr-settings") $("setBack").click();
 }
 let navT = 0, navDir = "";
 function padMenu(dt) {                                       // ポーズ中・メニュー中のコントローラー操作
@@ -398,12 +398,12 @@ addEventListener("keydown", e => {
 ["pointerdown", "mousemove"].forEach(ev => addEventListener(ev, () => document.body.classList.remove("padnav")));
 
 // ---- 画面(ホーム・ステージ選択・結果・ポーズ) ----
-const SCREENS = ["home", "select", "result", "pause"];
+const SCREENS = ["home", "select", "result", "pause", "help", "settings"];
 function showScreen(name) {
   SCREENS.forEach(s => { $("scr-" + s).style.display = s === name ? "flex" : "none"; });
   $("ui").style.display = name ? "flex" : "none";
   if (name && !matchMedia("(pointer:coarse)").matches) setTimeout(focusDefault, 30);
-  if (name === "home" || name === "select") { Snd.music({ menu: true, world: selWorld }); state = name; $("touch").style.display = "none"; $("aiUi").style.display = "none"; $("pauseBtn").style.display = "none"; }
+  if (name === "home" || name === "select" || name === "help" || name === "settings") { Snd.music({ menu: true, world: selWorld }); state = name; $("touch").style.display = "none"; $("aiUi").style.display = "none"; $("pauseBtn").style.display = "none"; }
 }
 function setPause(v) { paused = v; showScreen(v ? "pause" : null); if (v) $("ui").style.display = "flex"; keys.clear(); }
 
@@ -525,3 +525,25 @@ $("sndBgm").onclick = () => { Snd.setBgm(!Snd.bgm); syncSndBtns(); };
 $("sndSfx").onclick = () => { Snd.setSfx(!Snd.sfx); syncSndBtns(); Snd.play("click"); };
 syncSndBtns();
 document.querySelectorAll("#scr-home .big, #scr-result .big, #scr-pause .big, #selBack").forEach(b => b.addEventListener("click", () => Snd.play("click")));
+
+// ---- あそびかた・せってい ----
+$("homeHelp").onclick = () => showScreen("help");
+$("homeSettings").onclick = () => { renderSettings(); showScreen("settings"); };
+$("helpBack").onclick = () => { renderHome(); showScreen("home"); };
+$("setBack").onclick = () => { renderHome(); showScreen("home"); };
+function renderSettings() {
+  const seg = (id, opts, cur, set) => { const box = $(id); box.innerHTML = ""; opts.forEach(([v, label]) => { const b = document.createElement("button"); b.textContent = label; if (v === cur) b.classList.add("sel"); b.onclick = () => { set(v); Snd.play("click"); renderSettings(); }; box.appendChild(b); }); };
+  seg("setBgm", [[true, "オン"], [false, "オフ"]], Snd.bgm, v => Snd.setBgm(v));
+  seg("setSfx", [[true, "オン"], [false, "オフ"]], Snd.sfx, v => Snd.setSfx(v));
+  seg("setGfx", [["high", "きれい"], ["low", "軽い"]], getGfx(), v => { setGfx(v); });
+  syncSndBtns();
+  const r = $("resetData"); r.classList.remove("confirm"); r.textContent = "セーブデータを消す";
+  let armed = false;
+  r.onclick = () => {
+    if (!armed) { armed = true; r.classList.add("confirm"); r.textContent = "本当に消す?(もう一度押す)"; setTimeout(() => { armed = false; r.classList.remove("confirm"); r.textContent = "セーブデータを消す"; }, 4000); return; }
+    try { ["ck-prog", "ck-recipes", "ck-snd", "ck-gfx"].forEach(k => localStorage.removeItem(k)); } catch {}
+    location.reload();
+  };
+}
+function getGfx() { try { const v = localStorage.getItem("ck-gfx"); if (v) return v; } catch {} return matchMedia("(pointer:coarse)").matches ? "low" : "high"; }
+function setGfx(v) { try { localStorage.setItem("ck-gfx", v); } catch {} if (typeof applyQuality === "function") applyQuality(v); }

@@ -33,6 +33,7 @@
 - `src/app/` 画面。`/search` 検索結果、`/shop/[id]` 詳細、`/area/[area]/[genre]` 集客用ページ、`/cafes` カフェ、`/go/[id]` 送客、`/api/count` 件数
 - `supabase/migrations/0001_init.sql` テーブルとRPC関数
 - `.github/workflows/` CI・公開、OSM週次取り込み
+- `games/chaos-kitchen/` ぴためしとは別の協力料理ゲーム(オーバークック風)。Next.jsのビルドとは無関係で、単体で動く。詳細は `games/chaos-kitchen/README.md`
 
 ## 要件定義書のID
 F-xx 機能 / S-xx 絞り込み強化 / C-xx カフェ / U-xx 使いやすさ。コメントにIDを書いてあるので、要件との対応はIDで検索できる。

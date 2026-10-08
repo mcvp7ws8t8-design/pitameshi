@@ -33,6 +33,8 @@
   #who button{font-size:14px;font-weight:800;padding:4px 12px;border-radius:14px;border:3px solid transparent;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4)}
   #who button.sel{border-color:#fff}
   #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  #chips button.hl{background:var(--sun);color:var(--ink);border-color:#fff;animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(1.12)}}
   #chips button{font-size:13px;font-weight:800;padding:4px 10px;border-radius:14px;border:2px solid var(--ink);background:#6c4fb0;color:#fff}
 
   #touch{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:8px 14px;justify-content:space-between;align-items:center;touch-action:none}
@@ -109,6 +111,14 @@
   .confetti{position:fixed;top:-20px;width:10px;height:16px;border-radius:2px;animation:fall linear forwards;z-index:45;pointer-events:none}
   @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
   .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .sech{font-family:var(--pop);font-weight:400;font-size:28px;margin:0;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill}
+  .help h3{margin:10px 0 2px;font-family:var(--pop);font-weight:400;font-size:17px;color:var(--tomato)}
+  .help p{margin:4px 0;font-weight:800;font-size:14px;line-height:1.6}
+  .keys{width:100%;border-collapse:collapse;font-size:13px;font-weight:800;margin:4px 0}
+  .keys th,.keys td{border:2px solid var(--ink);padding:4px 6px;text-align:center}.keys th{background:var(--sun)}.keys td:first-child{background:#fff4c9}
+  .credits{font-size:13px;font-weight:800;line-height:1.7}
+  .ver{opacity:.5;font-size:12px;font-weight:800}
+  #resetData.confirm{background:var(--tomato);color:#fff}
   @media (pointer:coarse){.kbonly{display:none!important}}
   @media (max-width:700px){.scr{padding-top:58px}.big.small{width:auto}.iconbtn{width:34px;height:34px;font-size:15px;border-radius:12px}#snd{right:8px;top:8px;gap:6px}#btns button{font-size:15px;letter-spacing:-.5px}#chips{flex-wrap:nowrap;overflow-x:auto}#chips button{white-space:nowrap;font-size:14px;padding:6px 10px}#chat{height:52px}body{justify-content:flex-start}.big{min-width:0;width:100%;box-sizing:border-box}.row .big{width:auto;flex:1 1 40%}#stageGrid{gap:6px}}
   @media (prefers-reduced-motion:reduce){.hop span,.stars span.on{animation:none}}
@@ -141,6 +151,50 @@
     <div class="pill" id="homeStars"></div>
     <button class="big go" id="homeContinue">つづきから</button>
     <button class="big sub" id="homeStart">ステージを選ぶ</button>
+    <div class="row"><button class="big sub small" id="homeHelp">❓ あそびかた</button><button class="big sub small" id="homeSettings">⚙ せってい</button></div>
+    <div class="ver">Beta 0.9</div>
+  </div>
+  <div class="scr" id="scr-help">
+    <h2 class="sech">❓ あそびかた</h2>
+    <div class="card help">
+      <h3>めざすこと</h3>
+      <p>お客さんの注文どおりに料理を作って出そう。点数が目標に届くと★が増えて、次のステージが開くよ。</p>
+      <h3>料理の流れ</h3>
+      <p><b>厨房モード</b> 材料を取る → まな板で切る(長押し) → コンロ・フライヤー・オーブンで煮る/揚げる/焼く → お皿に盛る → 「提供」へ。<br><b>接客モード</b> 注文を取る → 料理を作って受け渡し台へ → テーブルに運ぶ → お会計 → お皿を下げて洗う。</p>
+      <p>調理器具は出来上がりのあと放っておくと焦げるよ。お皿は数に限りがあるから、洗ってね。</p>
+      <h3>操作</h3>
+      <table class="keys">
+        <tr><th></th><th>移動</th><th>つかむ・置く</th><th>切る・洗う(長押し)</th></tr>
+        <tr><td>キーボード1P</td><td>W A S D</td><td>E</td><td>Q</td></tr>
+        <tr><td>キーボード2P</td><td>矢印キー</td><td>.</td><td>,</td></tr>
+        <tr><td>コントローラー</td><td>スティック/十字キー</td><td>下か上のボタン</td><td>左か右のボタン</td></tr>
+        <tr><td>スマホ</td><td>左のスティック</td><td>赤いボタン</td><td>青いボタン(長押し)</td></tr>
+      </table>
+      <p>ポーズ: Esc / Start。人間は最大4人、AIと合わせて4人まで。</p>
+      <h3>AIに教えて育てる</h3>
+      <p>AIは最初、料理を知らないよ。画面下のチャットに日本語で指示してね。<br>
+      例:「レタスを取って」「まな板に置いて」「切って」「皿を取って」「レタスを皿に」「提供して」。<br>
+      <b>提供まで成功すると、その料理を覚える</b>よ。次からは「サラダ作って」の一言、「おまかせ」で注文を自分でさばくよ。「◯◯の作り方」と聞くと手順を教えてくれる。「ホールお願い」「キッチンお願い」で役割も頼める。覚えた料理は全ステージで使えるよ。</p>
+    </div>
+    <button class="big go" id="helpBack">もどる</button>
+  </div>
+  <div class="scr" id="scr-settings">
+    <h2 class="sech">⚙ せってい</h2>
+    <div class="card" id="setBox">
+      <div class="setrow"><b>🎵 BGM</b><div class="seg" id="setBgm"></div></div>
+      <div class="setrow"><b>🔊 効果音</b><div class="seg" id="setSfx"></div></div>
+      <div class="setrow"><b>🖼 画質</b><div class="seg" id="setGfx"></div></div>
+      <div class="dev">「軽い」は影と細かさを減らして、動きをなめらかにします。</div>
+    </div>
+    <div class="card credits">
+      <b>クレジット</b><br>
+      3D表示: three.js (MIT License)<br>
+      フォント: M PLUS Rounded 1c / Mochiy Pop One (Google Fonts, SIL OFL)<br>
+      絵文字: お使いの端末のもの<br>
+      効果音・BGM: ブラウザで合成(音声ファイルなし)
+    </div>
+    <button class="big sub small" id="resetData">セーブデータを消す</button>
+    <button class="big go" id="setBack">もどる</button>
   </div>
   <div class="scr" id="scr-select">
     <div class="head"><button class="big sub small" id="selBack">← もどる</button><h2 id="worldName"></h2></div>

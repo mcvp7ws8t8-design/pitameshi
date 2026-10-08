@@ -4,7 +4,7 @@
 const G3 = { ok: false };
 (function initG3() {
   try {
-    if (typeof THREE === "undefined") return;
+    if (typeof THREE === "undefined" || /[?&]2d\b/.test(location.search) || location.hash === "#2d") return;     // ?2d で2D表示を強制(動作確認用)
     const cvs = document.getElementById("gl");
     const r = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, powerPreference: "high-performance" });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); r.setSize(960, 640, false);
@@ -20,6 +20,15 @@ const G3 = { ok: false };
 
 // 3D用の色(光が当たるので、2Dより少し濃くする)
 const P3 = { floorA: "#bfeed9", floorB: "#a8e3c8", hallA: "#ffdcbc", hallB: "#ffcba0", iceA: "#c4ecfb", iceB: "#aedff4", wood: "#d49c5e", woodTop: "#f4d196", wall: "#6a52a0", wall2: "#604896", under: "#79b9a2" };
+// 画質: きれい(影あり・高解像度) / 軽い(影なし・解像度を抑える)
+function applyQuality(q) {
+  if (!G3.ok) return; const hi = q !== "low", dpr = window.devicePixelRatio || 1;
+  G3.r.setPixelRatio(hi ? Math.min(dpr, 2) : Math.min(dpr, 1.25)); G3.r.setSize(960, 640, false);
+  G3.r.shadowMap.enabled = hi; G3.sun.castShadow = hi;
+  matCache.forEach(m => { m.needsUpdate = true; });
+  G3.scene.traverse(o => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { m.needsUpdate = true; }); } });
+  G3.quality = q;
+}
 // ---- 共有の形・材質・絵 ----
 const CONEG = G3.ok && new THREE.CylinderGeometry(0, 1, 1, 20), HEMIG = G3.ok && new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), TRIG = G3.ok && new THREE.CylinderGeometry(1, 1, 1, 3);
 const BOXG = G3.ok && new THREE.BoxGeometry(1, 1, 1), CYLG = G3.ok && new THREE.CylinderGeometry(1, 1, 1, 28), SPHG = G3.ok && new THREE.SphereGeometry(1, 24, 16), PLANEG = G3.ok && new THREE.PlaneGeometry(1, 1);
@@ -464,3 +473,5 @@ function drawOverlay3D(tnow) {
     ctx.globalAlpha = Math.min(1, q.life * 2.2); txt(q.txt, a.x, a.y, 22 * k, "center", q.col, PAL.ink, FONT_POP); ctx.globalAlpha = 1;
   }
 }
+
+if (G3.ok && typeof getGfx === "function") applyQuality(getGfx());

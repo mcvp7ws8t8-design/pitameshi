@@ -36,8 +36,18 @@
 
 ## 検証
 ```
-node --test games/chaos-kitchen/test/stages.test.js     # 構造の検査
-node games/chaos-kitchen/tools/simulate.cjs 1 100        # AIによる自動プレイ(分業ステージはAI単独では届かないので対象外)
-node games/chaos-kitchen/tools/calibrate.cjs             # 処理能力の再測定
+node --test games/chaos-kitchen/test/stages.test.js     # 100ステージの構造(つながり・設備・一意性・決定性)
+node games/chaos-kitchen/tools/smoke.cjs                 # メニューから始めて数ステージを最後まで自動プレイ(3D)
+node games/chaos-kitchen/tools/smoke.cjs --2d            # 同じことを2D表示で(WebGLが使えない端末の代わり)
+node games/chaos-kitchen/tools/dishes.cjs                # 各ステージの各料理が、その地形で作れるか
+node games/chaos-kitchen/tools/simulate.cjs 1 100        # AI3人で全ステージを自動プレイ(難しさの目安。分業ステージは対象外)
+node games/chaos-kitchen/tools/calibrate.cjs             # AIの処理能力を測り直す(出題の速さの下限に使う)
 ```
-難易度(出題の速さ・星の基準・制限時間)は仮の値。人が遊んでみて調整する前提。
+- 表示: 3D(Three.js)が標準。`?2d` を付けると2D表示。WebGLが使えない端末では自動で2Dになる。画質は「せってい」で切り替え(スマホは初期値が「軽い」)。
+- ボス級のステージは、AI単独では点を取れないことがある(人間が計画的に動く前提)。
+- 難しさ(出題の速さ・星の基準・制限時間)は仮の値。人が遊んで調整する前提。
+
+## これから
+1. パソコン向けアプリ化(Electron)・Steam: 起動時の全画面、保存先の固定
+2. スイッチ版: ブラウザ版はそのまま動かないため、UnityかGodotで作り直す(ステージ定義 `js/stages.js`・料理 `js/data.js` は流用できる)
+3. スマホ版: 今のブラウザ版をベースに、タッチ操作の調整

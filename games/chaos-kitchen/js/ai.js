@@ -4,8 +4,8 @@
 const chatBox = $("chat"), chatIn = $("chatIn"), aiUi = $("aiUi");
 function chat(who, text, col) {
   const d = document.createElement("div");
-  d.textContent = (who === "ai" ? "🤖 " : "🧑 ") + text;
-  d.style.color = who === "ai" ? (col || "#9ff0b0") : "#ddd";
+  d.textContent = (who === "ai" ? "🤖 " : who === "tip" ? "💡 " : "🧑 ") + text;
+  d.style.color = who === "ai" ? (col || "#9ff0b0") : who === "tip" ? "#ffe27a" : "#ddd";
   chatBox.appendChild(d); chatBox.scrollTop = chatBox.scrollHeight;
   while (chatBox.children.length > 60) chatBox.removeChild(chatBox.firstChild);
 }
@@ -113,6 +113,28 @@ function buildChips() {
     b.onclick = () => sendCmd(t); chips.appendChild(b);
   });
 }
+// ---- はじめてのチュートリアル(1-1: AIにきざみレタスを教える) ----
+const TUT = { on: false, i: 0, steps: [
+  { say: "まずは「レタスを取って」と頼んでみよう(下のボタンを押してもOK)", chip: "レタスを取って", skill: "get", a: "lettuce" },
+  { say: "つぎは「まな板に置いて」", chip: "まな板に置いて", skill: "board" },
+  { say: "「切って」で、まな板のレタスを切ってもらおう", chip: "切って", skill: "chop" },
+  { say: "「皿を取って」でお皿を持ってきてもらおう", chip: "皿を取って", skill: "get", a: "plate" },
+  { say: "「レタスを皿に」で盛り付けよう", chip: "レタスを皿に", skill: "plateAdd" },
+  { say: "さいごに「提供して」。ここまで成功すると、AIがきざみレタスを覚えるよ!", chip: "提供して", skill: "deliver" },
+] };
+function hlChip(text) { document.querySelectorAll("#chips button").forEach(b => b.classList.toggle("hl", !!text && b.textContent === text)); }
+function tutShow() { const st = TUT.steps[TUT.i]; if (!st) return; chat("tip", `(${TUT.i + 1}/${TUT.steps.length}) ${st.say}`); hlChip(st.chip); }
+function tutStart() { TUT.on = true; TUT.i = 0; chat("tip", "AIのポチは、まだ料理を知らないよ。やり方を一つずつ教えてあげよう!"); tutShow(); }
+function tutCheck(r) {                                   // 指示がお手本どおりなら次へ(まとめて言ってもOK)
+  if (!TUT.on || !r || !r.steps) return;
+  let moved = false;
+  for (const x of r.steps) { const st = TUT.steps[TUT.i]; if (st && x.skill === st.skill && (st.a === undefined || x.a === st.a)) { TUT.i++; moved = true; } }
+  if (moved) { if (TUT.i < TUT.steps.length) tutShow(); else hlChip(null); }
+}
+function tutLearned(name) {
+  if (!TUT.on) return; TUT.on = false;
+  chat("tip", `すごい! これで${name}を覚えたよ。次から「${name}作って」の一言でOK。「おまかせ」なら注文を自分でさばくよ。`); hlChip(`${name}作って`);
+}
 function setupAiUi(nAi) {
   aiUi.style.display = nAi ? "block" : "none";
   if (!nAi) return;
@@ -120,6 +142,8 @@ function setupAiUi(nAi) {
   const known = Object.keys(recipes);
   players.filter(p => p.ai).forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
   chat("ai", "ヒント: 「◯◯の作り方」で手順が見られるよ。名前で指示(例「ポチ、切って」)、「みんな、〜」で全員。");
+  TUT.on = false; hlChip(null);
+  if (stage.id === 1 && !recipes["きざみレタス"]) tutStart();
 }
 function sendCmd(text) {
   text = text.trim(); if (!text || state !== "play") return;
@@ -132,7 +156,7 @@ function sendCmd(text) {
     const named = bots.filter(b => text.includes(b.name));
     if (named.length) { targets = named; selBot = bots.indexOf(named[0]); buildWho(); named.forEach(b => text = text.split(b.name).join("")); }
   }
-  const r = parse(text);
+  const r = parse(text); tutCheck(r);
   for (const b of targets) runCmd(b, r);
 }
 function runCmd(b, r) {
@@ -347,7 +371,7 @@ function botUpdate(b, dt) {
       b.fails = 0;
       if (learned && !recipes[learned.name] && b.log.length) {
         recipes[learned.name] = b.log.map(x => ({ skill: x.skill, a: x.a })); saveRecipes();
-        say(b, `${learned.name}、覚えた! 次からは「${learned.name}作って」でいいよ。`);
+        say(b, `${learned.name}、覚えた! 次からは「${learned.name}作って」でいいよ。`); tutLearned(learned.name);
       }
       b.log = [];
     } else if (c.s.src === "user") b.log.push(c.s);
