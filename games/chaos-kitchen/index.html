@@ -13,6 +13,9 @@
   #chat{height:64px;overflow:auto;background:#0008;font-size:13px;padding:4px 6px;border-radius:4px}
   #aiUi form{display:flex;gap:4px;margin-top:4px}
   #chatIn{flex:1;font-size:16px;padding:4px 8px}
+  #who{display:flex;gap:4px;margin-bottom:4px}
+  #who button{font-size:13px;padding:3px 9px;border-radius:12px;border:2px solid transparent;color:#fff;cursor:pointer}
+  #who button.sel{border-color:#fff}
   #chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
   #chips button{font-size:12px;padding:3px 7px;border-radius:12px;border:0;background:#3a5a44;color:#fff;cursor:pointer}
 </style>
@@ -20,11 +23,12 @@
 <body>
 <canvas id="c" width="960" height="720"></canvas>
 <div id="aiUi">
+  <div id="who"></div>
   <div id="chat"></div>
   <form id="chatForm"><input id="chatIn" autocomplete="off" placeholder="AIに指示・教える 例: レタスを取って"><button>送信</button></form>
   <div id="chips"></div>
 </div>
-<small>1P: WASD移動 / E=つかむ・置く / Q長押し=切る　2P: 矢印 / . = つかむ・置く / , 長押し=切る　3: AIに日本語で指示して教える</small>
+<small>1P: WASD移動 / E=つかむ・置く / Q長押し=切る　2P: 矢印 / . = つかむ・置く / , 長押し=切る　3/4/5: AI 1〜3人と協力(日本語で指示して教える)</small>
 <script>
 "use strict";
 const T = 80, W = 12, H = 8;
@@ -32,8 +36,8 @@ const MAP = [
   "#TTLL#CC#SS#",
   "#..........#",
   "D..........P",
-  "#....##....#",
-  "#....##....#",
+  "#....CC....#",
+  "#....CC....#",
   "D..........P",
   "#..........#",
   "#X##########",
@@ -57,6 +61,8 @@ addEventListener("keydown", e => {
     if (e.code === "Digit1") start(1);
     if (e.code === "Digit2") start(2);
     if (e.code === "Digit3") start(3);
+    if (e.code === "Digit4") start(4);
+    if (e.code === "Digit5") start(5);
   } else if (state === "end" && e.code === "Enter") state = "title";
   else if (state === "play") {
     players.forEach(p => { if (p.keys && e.code === p.keys.act && !e.repeat) interact(p); });
@@ -65,6 +71,7 @@ addEventListener("keydown", e => {
 });
 addEventListener("keyup", e => keys.delete(e.code));
 
+let spawnEvery = 16, selBot = 0;
 let state = "title", players = [], orders = [], score = 0, timeLeft = 0, spawnIn = 0, popups = [];
 let best = 0;
 try { best = +localStorage.getItem("ck-best") || 0; } catch {}
@@ -77,11 +84,15 @@ function start(n) {
   ];
   if (n === 2) players.push({ x: 8.5, y: 1.5, dir: [0, 1], item: null, col: "#4a8be8",
     keys: { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", act: "Period", chop: "Comma" } });
-  if (n === 3) players.push(newBot());
-  aiUi.style.display = n === 3 ? "block" : "none";
-  if (n === 3) {
-    chatBox.innerHTML = "";
-    chat("ai", Object.keys(recipes).length ? `また一緒だね! 覚えてる料理: ${Object.keys(recipes).join("、")}` : "はじめまして、新人です! 下のボタンで手順を教えてね。提供まで成功すると料理を覚えるよ。");
+  const nAi = n >= 3 ? n - 2 : 0;
+  for (let i = 0; i < nAi; i++) players.push(newBot(i));
+  spawnEvery = [16, 16, 13, 11][nAi];
+  aiUi.style.display = nAi ? "block" : "none";
+  if (nAi) {
+    selBot = 0; buildWho(); chatBox.innerHTML = "";
+    const known = Object.keys(recipes);
+    players.filter(p => p.ai).forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
+    chat("ai", "ヒント: 名前を呼んで指示(例「ポチ、切って」)。「みんな、〜」で全員。覚えた料理は全員で共有。");
   }
   orders = []; score = 0; timeLeft = GAME_TIME; spawnIn = 0; popups = [];
   state = "play";
@@ -123,14 +134,14 @@ function interact(p) {
   }
   if (c.t === "S") {
     if (h.kind === "ing" && h.type === "tomato" && h.state === "chopped" && c.stove === "idle") {
-      c.stove = "cooking"; c.prog = 0; p.item = null;
+      c.stove = "cooking"; c.owner = p.ai ? p.name : null; c.prog = 0; p.item = null;
     } else if (h.kind === "plate" && c.stove === "done" && canAdd(h, { kind: "ing", type: "tomato", state: "cooked" })) {
       h.contents.push({ type: "tomato", state: "cooked" }); c.stove = "idle"; c.prog = 0;
     }
     return;
   }
   if (c.t === "C") {
-    if (!c.item && h.kind === "ing" && h.state === "raw") { c.item = h; c.prog = 0; p.item = null; }
+    if (!c.item && h.kind === "ing" && h.state === "raw") { c.item = h; h.owner = p.ai ? p.name : null; c.prog = 0; p.item = null; }
     else if (c.item && c.item.state === "chopped" && h.kind === "plate" && canAdd(h, c.item)) {
       h.contents.push(c.item); c.item = null;
     }
@@ -153,7 +164,7 @@ function update(dt) {
   spawnIn -= dt;
   if (spawnIn <= 0 && orders.length < 4) {
     orders.push({ r: RECIPES[Math.floor(Math.random() * RECIPES.length)], t: 50, max: 50 });
-    spawnIn = 16;
+    spawnIn = spawnEvery;
   }
   for (const o of orders) o.t -= dt;
   for (let i = orders.length - 1; i >= 0; i--)
@@ -206,10 +217,10 @@ function moveBy(p, dx, dy) {
 // ---- AI相棒(指示を聞いて動く・教えると料理を覚える) ----
 const chatBox = document.getElementById("chat"), chatIn = document.getElementById("chatIn");
 const aiUi = document.getElementById("aiUi");
-function chat(who, text) {
+function chat(who, text, col) {
   const d = document.createElement("div");
   d.textContent = (who === "ai" ? "🤖 " : "🧑 ") + text;
-  d.style.color = who === "ai" ? "#9ff0b0" : "#ddd";
+  d.style.color = who === "ai" ? (col || "#9ff0b0") : "#ddd";
   chatBox.appendChild(d); chatBox.scrollTop = chatBox.scrollHeight;
   while (chatBox.children.length > 60) chatBox.removeChild(chatBox.firstChild);
 }
@@ -223,7 +234,7 @@ const dishOf = plate => {
   return RECIPES.find(r => [...r.need].sort().join(",") === k);
 };
 
-function say(b, text) { b.say = text; b.sayT = 3.5; chat("ai", text); }
+function say(b, text) { b.say = text; b.sayT = 3.5; chat("ai", `${b.name}: ${text}`, b.col); }
 
 // 人間の言葉 → 手順。skill: get/board/chop/grab/stove/plateAdd/deliver/trash/drop
 function parse(raw) {
@@ -257,12 +268,30 @@ const STEP_SAY = {
   trash: () => "捨てるね", drop: () => "ここに置いとくね",
 };
 
+const BOTS = [{ name: "ポチ", col: "#3fae5a", at: [8.5, 1.5] }, { name: "タマ", col: "#d98a1f", at: [5.5, 5.5] }, { name: "コタ", col: "#9a5ad9", at: [9.5, 5.5] }];
+function buildWho() {
+  const w = document.getElementById("who"); w.innerHTML = "";
+  players.filter(p => p.ai).forEach((b, i) => {
+    const btn = document.createElement("button"); btn.type = "button"; btn.textContent = "🤖" + b.name;
+    btn.style.background = b.col; btn.className = i === selBot ? "sel" : "";
+    btn.onclick = () => { selBot = i; buildWho(); }; w.appendChild(btn);
+  });
+}
 function sendCmd(text) {
-  text = text.trim(); if (!text) return;
+  text = text.trim(); if (!text || state !== "play") return;
   chat("you", text);
-  const b = players.find(p => p.ai);
-  if (!b || state !== "play") return;
+  const bots = players.filter(p => p.ai);
+  if (!bots.length) return;
+  let targets = [bots[Math.min(selBot, bots.length - 1)]];
+  if (/みんな|全員|ぜんいん/.test(text)) { targets = bots; text = text.replace(/みんな|全員|ぜんいん/g, ""); }
+  else {
+    const named = bots.filter(b => text.includes(b.name));
+    if (named.length) { targets = named; selBot = bots.indexOf(named[0]); buildWho(); named.forEach(b => text = text.split(b.name).join("")); }
+  }
   const r = parse(text);
+  for (const b of targets) runCmd(b, r);
+}
+function runCmd(b, r) {
   if (!r) { say(b, "ごめん、よくわからない…「レタスを取って」みたいに教えて!"); return; }
   if (r.cmd === "stop") { b.queue = []; b.cur = null; b.chopping = false; b.auto = false; b.log = []; say(b, "OK、止まるね。"); return; }
   if (r.cmd === "auto") {
@@ -282,12 +311,13 @@ function sendCmd(text) {
     rec.forEach(s => b.queue.push({ ...s, src: "auto" }));
     say(b, `了解、${r.dish.name}作るね!`); return;
   }
-  r.steps.forEach(s => b.queue.push(s));
+  r.steps.forEach(s => b.queue.push({ ...s }));
 }
 
-function newBot() {
-  return { x: 8.5, y: 1.5, dir: [0, 1], item: null, col: "#3fae5a", ai: true, queue: [], cur: null, wait: 0,
-    chopping: false, log: [], auto: false, fails: 0, say: "", sayT: 0, idleSay: 0 };
+function newBot(i) {
+  const d = BOTS[i];
+  return { x: d.at[0], y: d.at[1], dir: [0, 1], item: null, col: d.col, name: d.name, ai: true, queue: [], cur: null, wait: 0,
+    chopping: false, log: [], auto: false, fails: 0, say: "", sayT: 0, idleSay: 0, job: null };
 }
 
 // 幅優先探索: 床マスだけを歩く
@@ -336,19 +366,19 @@ function plan(b, s) {
       return r || F("それが見つからない…");
     case "board":
       if (!h || h.kind !== "ing" || h.state !== "raw") return F("切る食材を持ってないよ");
-      return go(c => c.t === "C" && !c.item) || F("まな板が空いてないよ");
+      return go(c => c.t === "C" && !c.item) || { wait: true };
     case "chop":
-      return go(c => c.t === "C" && c.item && c.item.state === "raw" && (!s.a || c.item.type === s.a), "chop") || F("切るものがまな板にないよ");
+      return go(c => c.t === "C" && c.item && c.item.state === "raw" && (!c.item.owner || c.item.owner === b.name) && (!s.a || c.item.type === s.a), "chop") || F("切るものがまな板にないよ");
     case "grab":
       if (h) return F("手がふさがってるよ");
-      return go(c => c.t === "C" && c.item && c.item.state === "chopped" && c.item.type === s.a) || F(`切った${ING_JA[s.a]}がないよ`);
+      return go(c => c.t === "C" && c.item && c.item.state === "chopped" && (!c.item.owner || c.item.owner === b.name) && c.item.type === s.a) || F(`切った${ING_JA[s.a]}がないよ`);
     case "stove":
       if (!h || h.kind !== "ing" || h.type !== "tomato" || h.state !== "chopped") return F("切ったトマトを持ってないよ");
-      return go(c => c.t === "S" && c.stove === "idle") || F("コンロが空いてないよ");
+      return go(c => c.t === "S" && c.stove === "idle") || { wait: true };
     case "plateAdd": {
       if (!h || h.kind !== "plate") return F("お皿を持ってないよ");
-      r = go(c => (c.t === "C" && c.item && c.item.state === "chopped" && canAdd(h, c.item) && (!s.a || c.item.type === s.a)) ||
-        (c.t === "S" && c.stove === "done" && canAdd(h, { kind: "ing", type: "tomato", state: "cooked" }) && (!s.a || s.a === "tomato")));
+      r = go(c => (c.t === "C" && c.item && c.item.state === "chopped" && (!c.item.owner || c.item.owner === b.name) && canAdd(h, c.item) && (!s.a || c.item.type === s.a)) ||
+        (c.t === "S" && c.stove === "done" && (!c.owner || c.owner === b.name) && canAdd(h, { kind: "ing", type: "tomato", state: "cooked" }) && (!s.a || s.a === "tomato")));
       if (r) return r;
       if (tiles.some(row => row.some(c => c.t === "S" && c.stove === "cooking")) && (!s.a || s.a === "tomato")) return { wait: true };
       return F("盛れるものがないよ");
@@ -432,13 +462,14 @@ function botUpdate(b, dt) {
 function autoPick(b, dt) {
   if (!b.auto) return;
   if (b.item) { b.queue.push({ skill: b.item.kind === "plate" && b.item.contents.length ? "deliver" : "trash", src: "auto" }); return; }
-  const o = orders.filter(o => recipes[o.r.name]).sort((x, y) => x.t - y.t)[0];
+  b.job = null;
+  const o = orders.filter(o => recipes[o.r.name] && !players.some(p => p.ai && p.job === o)).sort((x, y) => x.t - y.t)[0];
   if (!o) {
     b.idleSay -= dt;
-    if (b.idleSay <= 0) { b.idleSay = 15; say(b, orders.length ? "この注文は作り方を知らないよ…教えて!" : "注文待ちだよ。"); }
+    if (b.idleSay <= 0) { b.idleSay = 15; if (!orders.length) say(b, "注文待ちだよ。"); else if (!orders.some(o => recipes[o.r.name])) say(b, "この注文は作り方を知らないよ…教えて!"); }
     return;
   }
-  say(b, `${o.r.name}、作るね!`);
+  b.job = o; say(b, `${o.r.name}、作るね!`);
   recipes[o.r.name].forEach(s => b.queue.push({ ...s, src: "auto" }));
 }
 
@@ -493,7 +524,7 @@ function draw() {
     ctx.arc(px + p.dir[0] * 12 + 8, py + p.dir[1] * 12 - 4, 5, 0, 7); ctx.fill();
     if (p.item) drawItem(p.item, px + p.dir[0] * 34, py + p.dir[1] * 34, 0.9);
     if (p.ai) {
-      txt("🤖AI", px, py - 38, 16);
+      txt("🤖" + p.name, px, py - 38, 16, "center", p.col);
       if (p.sayT > 0 && p.say) {
         ctx.font = "bold 16px system-ui,sans-serif";
         const w = Math.min(ctx.measureText(p.say).width + 16, 440), bx = Math.max(4, Math.min(cv.width - w - 4, px - w / 2));
@@ -521,8 +552,8 @@ function draw() {
       txt("注文どおりに料理を作って「提供」へ運ぼう", 480, 270, 26);
       txt("サラダ=レタス+トマトを切る　スープ=切ったトマトをコンロで煮る", 480, 316, 20);
       txt("お皿(🍽)に盛ってから提供。コンロは放置すると焦げる!", 480, 348, 20);
-      txt("1 ひとり　/　2 ふたり　/　3 AIに教えながらプレイ", 480, 430, 30, "center", "#ffd66b");
-      txt("3: AIに日本語で指示して、手順を教えて育てよう(覚えた料理は保存されます)", 480, 480, 18);
+      txt("1 ひとり / 2 ふたり / 3・4・5 AI 1〜3人と協力", 480, 430, 30, "center", "#ffd66b");
+      txt("AIに日本語で指示して手順を教えよう。覚えた料理は全員で共有・保存されます", 480, 480, 18);
       txt(`ベストスコア ${best}`, 480, 530, 22);
     } else {
       txt("タイムアップ!", 480, 220, 54);
