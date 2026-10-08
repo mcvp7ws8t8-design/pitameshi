@@ -13,8 +13,10 @@
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
   input{-webkit-user-select:text;user-select:text}
   button{font-family:inherit;cursor:pointer}
-  #stage{position:relative;max-width:100vw}
-  canvas{display:block;max-width:100vw;max-height:calc(100vh - 28px);background:var(--plum)}
+  #stage{position:relative;width:min(960px,100vw,calc((100vh - 28px) * 960 / 720));aspect-ratio:960/720}
+  #stage canvas{position:absolute;left:0;top:0;width:100%;display:block}
+  #gl{height:calc(100% * 640 / 720);background:var(--plum)}
+  #c{height:100%;background:transparent}
   small.hint{opacity:.7;margin-top:6px;font-weight:800}
   .iconbtn{width:40px;height:40px;border-radius:14px;border:3px solid var(--ink);background:#fff;color:var(--ink);font-size:18px;box-shadow:0 4px 0 rgba(0,0,0,.35);padding:0}
   .iconbtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
@@ -108,6 +110,7 @@
 </head>
 <body>
 <div id="stage">
+  <canvas id="gl" width="960" height="640"></canvas>
   <canvas id="c" width="960" height="720"></canvas>
   <button id="pauseBtn" class="iconbtn" title="ポーズ">⏸</button>
 </div>
@@ -162,7 +165,9 @@
 <script src="js/stages.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/game.js"></script>
+<script src="js/vendor/three.min.js"></script>
 <script src="js/art.js"></script>
+<script src="js/art3d.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/main.js"></script>
 </body>

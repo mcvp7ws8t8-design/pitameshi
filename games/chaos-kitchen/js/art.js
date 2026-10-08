@@ -31,7 +31,7 @@ function star5(x, y, r, fill, stroke) {
 
 // ---- エフェクト(単位はマス) ----
 const fx = []; let shake = 0;
-function fxAdd(o) { fx.push({ life: 0.8, vx: 0, vy: 0, g: 0, size: 6, col: "#fff", type: "dot", rot: 0, ...o, max: o.life || 0.8 }); }
+function fxAdd(o) { fx.push({ life: 0.8, vx: 0, vy: 0, g: 0, size: 6, col: "#fff", type: "dot", rot: 0, ...o, max: o.life || 0.8, y0: o.y, h: 0 }); }
 function fxBurst(x, y, n = 8, cols = [PAL.sun, PAL.pink, PAL.mint, PAL.sky], sp = 2.6) {
   for (let i = 0; i < n; i++) {
     const a = Math.random() * 6.28, v = sp * (0.4 + Math.random() * 0.8);
@@ -44,7 +44,7 @@ const fxSmoke = c => fxAdd({ x: c.x + 0.3 + Math.random() * 0.4, y: c.y + 0.3, v
 const fxBubble = c => fxAdd({ x: c.x + 0.3 + Math.random() * 0.4, y: c.y + 0.5, vx: 0, vy: -0.8, life: 0.7, size: 5 + Math.random() * 4, col: "#bfeaff", type: "ring" });
 const fxCoin = (x, y) => fxAdd({ x, y, vy: -1.4, life: 0.9, size: 30, type: "emoji", ch: "💰" });
 function updateFx(dt) {
-  for (const f of fx) { f.life -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += f.g * dt; f.rot += dt * 6; }
+  for (const f of fx) { f.life -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.h -= f.vy * dt; f.vy += f.g * dt; f.rot += dt * 6; }
   for (let i = fx.length - 1; i >= 0; i--) if (fx[i].life <= 0) fx.splice(i, 1);
   if (shake > 0) shake = Math.max(0, shake - dt * 2.5);
 }
@@ -354,14 +354,18 @@ function drawHud(tnow) {
 function draw() {
   const tnow = performance.now() / 1000;
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = PAL.plum; ctx.fillRect(0, 0, cv.width, cv.height);
+  const use3 = G3.ok && stage && G3.group;
+  if (!use3) { ctx.fillStyle = PAL.plum; ctx.fillRect(0, 0, cv.width, cv.height); }
   if (!stage) { txt("てんやわんやキッチン", 480, 300, 54, "center", "#fff", PAL.ink, FONT_POP); return; }
-  ctx.save();
-  const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0, sy = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
-  ctx.translate(view.ox + sx, view.oy + sy); ctx.scale(view.sc, view.sc);
-  ctx.beginPath(); ctx.rect(-20, -20, W * T + 40, H * T + 40); ctx.clip();
-  drawWorld(tnow);
-  ctx.restore();
+  if (use3) { render3D(tnow); drawOverlay3D(tnow); }
+  else {
+    ctx.save();
+    const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0, sy = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
+    ctx.translate(view.ox + sx, view.oy + sy); ctx.scale(view.sc, view.sc);
+    ctx.beginPath(); ctx.rect(-20, -20, W * T + 40, H * T + 40); ctx.clip();
+    drawWorld(tnow);
+    ctx.restore();
+  }
   drawHud(tnow);
   if (ev) {
     const d = EVENTS[ev.type], label = `${d.icon} ${d.name}  ${Math.ceil(ev.t)}秒`;

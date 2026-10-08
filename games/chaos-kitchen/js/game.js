@@ -16,7 +16,7 @@ const itemKey = i => i.type + ":" + i.state;
 const plateKey = it => it.contents.map(itemKey).sort().join(",");
 const needKey = r => [...r.need].sort().join(",");
 const dishOf = plate => RECIPES.find(r => needKey(r) === plateKey(plate));
-const popup = (txt, x, y, col = "#fff") => popups.push({ txt, x, y, life: 1.2, col });
+const popup = (txt, x, y, col = "#fff") => popups.push({ txt, x, y, y0: y, life: 1.2, col });
 
 // ---- 状態 ----
 let W = 0, H = 0, tiles = [], stage = null, view = { sc: 1, ox: 0, oy: 0 };
@@ -58,6 +58,7 @@ function startStage(id, mode) {
   H = tiles.length; W = tiles[0].length;
   tiles.forEach(row => row.forEach(c => { c.inner = c.t === "#" && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => tiles[c.y + dy] && tiles[c.y + dy][c.x + dx] && WALK.has(tiles[c.y + dy][c.x + dx].t)); }));
   fx.length = 0; shake = 0; lastSec = -1;
+  if (typeof build3D === "function" && G3.ok) build3D();
   const sc = Math.min(1.25, MAPW / (W * T), MAPH / (H * T));
   view = { sc, ox: (MAPW - W * T * sc) / 2, oy: (MAPH - H * T * sc) / 2 };
   dark.width = W * T; dark.height = H * T;
