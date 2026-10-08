@@ -4,67 +4,117 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>てんやわんやキッチン</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Mochiy+Pop+One&display=swap">
 <style>
-  html,body{margin:0;background:#1d1a17;color:#fff;font-family:system-ui,sans-serif;height:100%;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  /* かわいいポップ: 太い縁取り・丸み・はっきりした色。ゲームなので暗い紫の背景で固定する */
+  :root{--plum:#2d2250;--ink:#3a2b57;--paper:#fffaf0;--sun:#ffc93c;--sun-lo:#d49a14;--tomato:#ff5a5f;--mint:#3ddc97;--sky:#4cc9f0;--pink:#ff8fb8;--grape:#9d6bff;
+    --font:'M PLUS Rounded 1c','Hiragino Maru Gothic ProN','Yu Gothic UI',system-ui,sans-serif;--pop:'Mochiy Pop One','M PLUS Rounded 1c','Hiragino Maru Gothic ProN',system-ui,sans-serif;color-scheme:dark}
+  html,body{margin:0;background-color:var(--plum);background-image:radial-gradient(rgba(255,255,255,.07) 2px,transparent 2.5px);background-size:30px 30px;color:#fff;font-family:var(--font);font-weight:500;height:100%;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
   input{-webkit-user-select:text;user-select:text}
-  button{font-family:inherit}
+  button{font-family:inherit;cursor:pointer}
   #stage{position:relative;max-width:100vw}
-  canvas{display:block;max-width:100vw;max-height:calc(100vh - 28px);background:#1d1a17}
-  small.hint{opacity:.6;margin-top:4px}
-  #pauseBtn{display:none;position:absolute;right:6px;top:6px;z-index:5;width:36px;height:36px;border-radius:8px;border:0;background:#000a;color:#fff;font-size:18px}
+  canvas{display:block;max-width:100vw;max-height:calc(100vh - 28px);background:var(--plum)}
+  small.hint{opacity:.7;margin-top:6px;font-weight:800}
+  .iconbtn{width:40px;height:40px;border-radius:14px;border:3px solid var(--ink);background:#fff;color:var(--ink);font-size:18px;box-shadow:0 4px 0 rgba(0,0,0,.35);padding:0}
+  .iconbtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  .iconbtn.off{background:#cfc6e4;color:#8a7fa8;text-decoration:line-through}
+  #pauseBtn{display:none;position:absolute;left:8px;top:8px;z-index:5}
+  #snd{position:fixed;right:10px;top:10px;z-index:40;display:flex;gap:8px}
 
-  #aiUi{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:4px 8px}
-  #chat{height:64px;overflow:auto;background:#0008;font-size:13px;padding:4px 6px;border-radius:4px}
-  #aiUi form{display:flex;gap:4px;margin-top:4px}
-  #chatIn{flex:1;font-size:16px;padding:4px 8px}
-  #who{display:flex;gap:4px;margin-bottom:4px}
-  #who button{font-size:13px;padding:3px 9px;border-radius:12px;border:2px solid transparent;color:#fff;cursor:pointer}
+  #aiUi{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:6px 10px}
+  #chat{height:64px;overflow:auto;background:rgba(0,0,0,.35);border:3px solid var(--ink);font-size:13px;font-weight:800;padding:4px 8px;border-radius:14px}
+  #aiUi form{display:flex;gap:6px;margin-top:6px}
+  #chatIn{flex:1;font:inherit;font-size:16px;padding:6px 12px;border-radius:14px;border:3px solid var(--ink);background:var(--paper);color:var(--ink)}
+  #aiUi form button{border:3px solid var(--ink);border-radius:14px;background:var(--sun);color:var(--ink);font-weight:800;padding:0 16px;box-shadow:0 4px 0 var(--sun-lo)}
+  #who{display:flex;gap:6px;margin-bottom:6px}
+  #who button{font-size:14px;font-weight:800;padding:4px 12px;border-radius:14px;border:3px solid transparent;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4)}
   #who button.sel{border-color:#fff}
-  #chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-  #chips button{font-size:12px;padding:3px 7px;border-radius:12px;border:0;background:#3a5a44;color:#fff;cursor:pointer}
+  #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  #chips button{font-size:13px;font-weight:800;padding:4px 10px;border-radius:14px;border:2px solid var(--ink);background:#6c4fb0;color:#fff}
 
-  #touch{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:8px;justify-content:space-between;align-items:center;touch-action:none}
-  #pad{position:relative;width:150px;height:150px;border-radius:50%;background:#fff2;border:2px solid #fff4;touch-action:none}
-  #knob{position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:#fffa;pointer-events:none}
+  #touch{display:none;width:960px;max-width:100vw;box-sizing:border-box;padding:8px 14px;justify-content:space-between;align-items:center;touch-action:none}
+  #pad{position:relative;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.14);border:4px solid rgba(255,255,255,.55);touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:66px;height:66px;margin:-33px 0 0 -33px;border-radius:50%;background:var(--sun);border:4px solid var(--ink);box-shadow:0 4px 0 var(--sun-lo);pointer-events:none}
   #btns{display:flex;gap:16px}
-  #btns button{width:96px;height:96px;border-radius:50%;border:0;font-size:18px;font-weight:bold;color:#fff;touch-action:none}
-  #actBtn{background:#e8504a}#chopBtn{background:#3a8bd8}
+  #btns button{width:98px;height:98px;border-radius:50%;border:5px solid var(--ink);font-size:17px;font-weight:800;color:#fff;touch-action:none;text-shadow:0 2px 0 rgba(0,0,0,.35);box-shadow:0 6px 0 rgba(0,0,0,.4)}
+  #btns button:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.4)}
+  #actBtn{background:var(--tomato)}#chopBtn{background:var(--sky)}
 
   /* ---- メニュー画面 ---- */
-  #ui{display:none;position:fixed;inset:0;z-index:20;background:rgba(20,16,12,.95);align-items:center;justify-content:center;overflow:auto}
-  .scr{display:none;flex-direction:column;align-items:center;gap:12px;width:min(720px,100vw);box-sizing:border-box;padding:14px;max-height:100%;overflow:auto}
-  .scr h1{margin:0;font-size:34px}.scr h2{margin:0}
-  .big{font-size:20px;padding:14px 22px;border:0;border-radius:12px;background:#e8a23a;color:#222;font-weight:bold;cursor:pointer;min-width:240px}
-  .big.sub{background:#4a4540;color:#fff}
-  .big:disabled{background:#555;color:#999;cursor:default}
-  #worldTabs{display:flex;gap:6px;overflow-x:auto;width:100%;padding-bottom:4px}
-  #worldTabs button{flex:0 0 auto;min-width:52px;border:2px solid transparent;border-radius:10px;background:#3a342e;color:#fff;padding:4px 6px;display:flex;flex-direction:column;align-items:center;cursor:pointer}
-  #worldTabs button span{font-size:22px}#worldTabs button small{font-size:10px;opacity:.8}
-  #worldTabs button.sel,#stageGrid button.sel,#modePick button.sel{border-color:#ffd66b}
-  #worldTabs button.lock,#stageGrid button.lock{opacity:.45}
-  #stageGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%}
-  #stageGrid button{border:2px solid transparent;border-radius:10px;background:#4a4137;color:#fff;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
-  #stageGrid button b{font-size:20px}#stageGrid button small{color:#ffcc44;font-size:12px}
-  #stageInfo{width:100%;background:#2b2622;border-radius:10px;padding:8px 12px;box-sizing:border-box;font-size:14px}
-  #stageInfo h3{margin:0 0 4px;font-size:18px}#stageInfo em{font-style:normal;color:#ffd66b;font-size:13px}
-  #stageInfo p{margin:3px 0}#stageInfo .tip{color:#9fe3b0}
-  #modePick{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
-  #modePick button{border:2px solid transparent;border-radius:10px;background:#3a342e;color:#fff;padding:8px 12px;cursor:pointer;font-size:14px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-  .stars{font-size:46px;color:#ffcc44;letter-spacing:6px}
+  #ui{display:none;position:fixed;inset:0;z-index:20;background-color:var(--plum);background-image:radial-gradient(rgba(255,255,255,.07) 2px,transparent 2.5px);background-size:30px 30px;align-items:center;justify-content:center;overflow:auto}
+  .scr{display:none;flex-direction:column;align-items:center;gap:14px;width:min(740px,100vw);box-sizing:border-box;padding:18px 16px;max-height:100%;overflow:auto}
+  .card{background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:24px;box-shadow:0 8px 0 rgba(0,0,0,.35);padding:12px 16px;box-sizing:border-box;width:100%}
+  .big{font-family:var(--pop);font-size:21px;padding:14px 26px;border:4px solid var(--ink);border-radius:20px;background:var(--sun);color:var(--ink);box-shadow:0 7px 0 var(--sun-lo);min-width:250px;transition:transform .08s}
+  .big:active{transform:translateY(5px);box-shadow:0 2px 0 var(--sun-lo)}
+  .big.sub{background:#fff;box-shadow:0 7px 0 #b9b0d0}
+  .big.sub:active{box-shadow:0 2px 0 #b9b0d0}
+  .big.go{background:var(--mint);box-shadow:0 7px 0 #1fa56d}
+  .big:disabled{background:#cfc6e4;box-shadow:0 7px 0 #a79dc4;color:#8a7fa8;cursor:default}
+  .small{font-size:14px;padding:8px 16px;min-width:0;border-radius:14px;box-shadow:0 4px 0 #b9b0d0}
+
+  /* ホーム */
+  #scr-home{gap:18px}
+  .logo{font-family:var(--pop);font-size:clamp(40px,10vw,66px);line-height:1.1;margin:0;text-align:center;color:#fff;-webkit-text-stroke:9px var(--ink);paint-order:stroke fill;letter-spacing:2px;text-shadow:0 6px 0 var(--ink)}
+  .logo span:nth-child(1){color:var(--tomato)}.logo span:nth-child(2){color:var(--sun)}.logo span:nth-child(3){color:var(--mint)}.logo span:nth-child(4){color:var(--sky)}
+  .logo-sub{font-size:clamp(22px,6vw,32px);display:block;margin-top:4px}
+  .hop{display:flex;gap:6px;font-size:40px}
+  .hop span{display:inline-block;animation:hop 1.1s ease-in-out infinite}
+  .hop span:nth-child(2){animation-delay:.12s}.hop span:nth-child(3){animation-delay:.24s}.hop span:nth-child(4){animation-delay:.36s}.hop span:nth-child(5){animation-delay:.48s}.hop span:nth-child(6){animation-delay:.6s}
+  @keyframes hop{0%,100%{transform:translateY(0) scale(1,1)}40%{transform:translateY(-16px) scale(.95,1.05)}60%{transform:translateY(0) scale(1.08,.92)}}
+  .pill{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--ink);border:3px solid var(--ink);border-radius:999px;padding:4px 16px;font-weight:800;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+  #homeStars{font-size:20px}
+  .tagline{margin:0;text-align:center;font-weight:800;opacity:.9}
+
+  /* ステージ選択 */
+  .head{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px}
+  #worldName{font-family:var(--pop);font-size:clamp(18px,4.5vw,26px);margin:0;text-align:right;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;color:#fff}
+  #worldTabs{display:flex;gap:8px;overflow-x:auto;width:100%;padding:6px 4px 10px}
+  #worldTabs button{flex:0 0 auto;width:62px;border:4px solid var(--ink);border-radius:20px;background:var(--wc);color:var(--ink);padding:4px 0 3px;display:flex;flex-direction:column;align-items:center;line-height:1.1;box-shadow:0 5px 0 rgba(0,0,0,.35);transition:transform .1s}
+  #worldTabs button span{font-size:26px}#worldTabs button small{font-size:11px;font-weight:800}
+  #worldTabs button.sel{transform:translateY(-4px) scale(1.08);outline:4px solid #fff;outline-offset:1px}
+  #worldTabs button.lock{filter:grayscale(.9) brightness(.8)}
+  #stageGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;padding:0 2px}
+  #stageGrid button{position:relative;border:4px solid var(--ink);border-radius:18px;background:#fff;color:var(--ink);padding:8px 2px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 5px 0 rgba(0,0,0,.35)}
+  #stageGrid button:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+  #stageGrid button b{font-family:var(--pop);font-size:24px;font-weight:400;line-height:1}
+  #stageGrid button .st{font-size:14px;color:#ffb300;letter-spacing:1px;-webkit-text-stroke:.5px var(--ink)}
+  #stageGrid button .crown{position:absolute;right:-6px;top:-12px;font-size:20px;transform:rotate(14deg)}
+  #stageGrid button.sel{background:var(--wc);outline:4px solid #fff;outline-offset:1px;transform:translateY(-3px)}
+  #stageGrid button.lock{background:#cfc6e4;color:#8a7fa8}
+  #stageInfo h3{margin:0 0 6px;font-family:var(--pop);font-weight:400;font-size:21px}
+  #stageInfo .tag{display:inline-block;background:var(--wc);border:2px solid var(--ink);border-radius:999px;padding:1px 10px;font-size:13px;font-weight:800;margin:2px 4px 2px 0}
+  #stageInfo .dish{display:inline-block;background:#fff;border:2px solid var(--ink);border-radius:12px;padding:2px 8px;font-size:14px;font-weight:800;margin:3px 4px 3px 0}
+  #stageInfo .tip{background:#fff4c9;border:3px solid #e2b94a;border-radius:16px;padding:6px 12px;font-weight:800;font-size:14px;margin:8px 0 0}
+  #stageInfo .goal{font-weight:800;font-size:13px;color:#6b5a8c;margin-top:6px}
+  #modePick{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  #modePick button{border:4px solid var(--ink);border-radius:16px;background:#fff;color:var(--ink);padding:6px 12px;font-weight:800;font-size:15px;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+  #modePick button.sel{background:var(--sun);outline:3px solid #fff}
+
+  /* 結果 */
+  .stars{display:flex;gap:10px;font-size:64px;line-height:1}
+  .stars span{display:inline-block;color:#6d5b94;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;opacity:.55;transform:scale(.8)}
+  .stars span.on{color:var(--sun);opacity:1;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
+  @keyframes pop{0%{transform:scale(0) rotate(-40deg)}100%{transform:scale(1) rotate(0)}}
+  #resTitle{font-family:var(--pop);font-weight:400;margin:0;font-size:24px;text-align:center;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;color:#fff}
+  #resScore{font-family:var(--pop);font-size:34px;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill}
+  .confetti{position:fixed;top:-20px;width:10px;height:16px;border-radius:2px;animation:fall linear forwards;z-index:45;pointer-events:none}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
   @media (pointer:coarse){.kbonly{display:none!important}}
-  @media (max-width:700px){#chips{flex-wrap:nowrap;overflow-x:auto}#chips button{white-space:nowrap;font-size:14px;padding:6px 10px}#chat{height:52px}body{justify-content:flex-start}.scr h1{font-size:26px}}
+  @media (max-width:700px){.scr{padding-top:58px}.big.small{width:auto}.iconbtn{width:34px;height:34px;font-size:15px;border-radius:12px}#snd{right:8px;top:8px;gap:6px}#btns button{font-size:15px;letter-spacing:-.5px}#chips{flex-wrap:nowrap;overflow-x:auto}#chips button{white-space:nowrap;font-size:14px;padding:6px 10px}#chat{height:52px}body{justify-content:flex-start}.big{min-width:0;width:100%;box-sizing:border-box}.row .big{width:auto;flex:1 1 40%}#stageGrid{gap:6px}}
+  @media (prefers-reduced-motion:reduce){.hop span,.stars span.on{animation:none}}
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="c" width="960" height="720"></canvas>
-  <button id="pauseBtn" title="ポーズ">⏸</button>
+  <button id="pauseBtn" class="iconbtn" title="ポーズ">⏸</button>
 </div>
+<div id="snd"><button id="sndBgm" class="iconbtn" title="BGM">🎵</button><button id="sndSfx" class="iconbtn" title="効果音">🔊</button></div>
 <div id="touch">
   <div id="pad"><div id="knob"></div></div>
-  <div id="btns"><button id="chopBtn">切る/洗う<br>(長押し)</button><button id="actBtn">つかむ<br>置く</button></div>
+  <div id="btns"><button id="chopBtn">切る/洗う<br>長押し</button><button id="actBtn">つかむ<br>置く</button></div>
 </div>
 <div id="aiUi">
   <div id="who"></div>
@@ -72,36 +122,37 @@
   <form id="chatForm"><input id="chatIn" autocomplete="off" placeholder="AIに指示・教える 例: レタスを取って"><button>送信</button></form>
   <div id="chips"></div>
 </div>
-<small class="hint kbonly">1P: WASD移動 / E=つかむ・置く / Q長押し=切る・洗う　2P: 矢印 / . / , 長押し　Esc=ポーズ</small>
+<small class="hint kbonly">1P: WASD / E=つかむ・置く / Q長押し=切る・洗う　2P: 矢印 / . / , 長押し　Esc=ポーズ</small>
 
 <div id="ui">
   <div class="scr" id="scr-home">
-    <h1>🍳 てんやわんやキッチン</h1>
-    <p style="margin:0;opacity:.85;text-align:center">キッチンで料理して、ホールで接客して、AIに教えて育てよう。<br>全100ステージ!</p>
-    <div id="homeStars" style="font-size:22px;color:#ffcc44"></div>
-    <button class="big" id="homeContinue">つづきから</button>
+    <h1 class="logo"><span>てんや</span><span>わんや</span><span class="logo-sub"><span>キッ</span><span>チン</span></span></h1>
+    <div class="hop"><span>🍅</span><span>🥬</span><span>🥩</span><span>🍚</span><span>🧀</span><span>🍟</span></div>
+    <p class="tagline">料理して、接客して、AIに教えて育てよう!<br>全100ステージ</p>
+    <div class="pill" id="homeStars"></div>
+    <button class="big go" id="homeContinue">つづきから</button>
     <button class="big sub" id="homeStart">ステージを選ぶ</button>
   </div>
   <div class="scr" id="scr-select">
-    <div class="row" style="width:100%;justify-content:space-between;align-items:center"><button class="big sub" id="selBack" style="min-width:0;padding:8px 14px;font-size:16px">← もどる</button><h2 id="worldName"></h2></div>
+    <div class="head"><button class="big sub small" id="selBack">← もどる</button><h2 id="worldName"></h2></div>
     <div id="worldTabs"></div>
     <div id="stageGrid"></div>
-    <div id="stageInfo"></div>
+    <div id="stageInfo" class="card"></div>
     <div id="modePick"></div>
-    <button class="big" id="stageGo">スタート</button>
-    <button class="big sub" id="unlockAll" style="min-width:0;padding:8px 14px;font-size:14px"></button>
+    <button class="big go" id="stageGo">スタート</button>
+    <button class="big sub small" id="unlockAll"></button>
   </div>
   <div class="scr" id="scr-result">
     <h2 id="resTitle"></h2>
     <div class="stars" id="resStars"></div>
-    <div id="resScore" style="font-size:26px"></div>
-    <div id="resGoals" style="opacity:.8"></div>
-    <div id="resMsg" style="color:#9fe3b0;min-height:1.2em"></div>
-    <div class="row"><button class="big" id="resNext">次のステージ</button><button class="big sub" id="resRetry">もう一度</button><button class="big sub" id="resSelect">ステージ選択</button></div>
+    <div id="resScore"></div>
+    <div id="resGoals" class="pill"></div>
+    <div id="resMsg" style="color:var(--mint);font-weight:800;min-height:1.3em"></div>
+    <div class="row"><button class="big go" id="resNext">次のステージ</button><button class="big" id="resRetry">もう一度</button><button class="big sub" id="resSelect">ステージ選択</button></div>
   </div>
   <div class="scr" id="scr-pause">
-    <h2>ポーズ中</h2>
-    <button class="big" id="pauseResume">つづける</button>
+    <h2 class="logo" style="font-size:44px">ポーズ中</h2>
+    <button class="big go" id="pauseResume">つづける</button>
     <button class="big sub" id="pauseQuit">ステージ選択にもどる</button>
   </div>
 </div>
@@ -109,7 +160,9 @@
 <script src="js/data.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/stages.js"></script>
+<script src="js/sound.js"></script>
 <script src="js/game.js"></script>
+<script src="js/art.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/main.js"></script>
 </body>
