@@ -30,8 +30,8 @@ const dark = document.createElement("canvas");
 let prog = { stars: {}, best: {}, mode: 3 };
 try { Object.assign(prog, JSON.parse(localStorage.getItem("ck-prog") || "{}")); } catch {}
 const saveProg = () => { try { localStorage.setItem("ck-prog", JSON.stringify(prog)); } catch {} };
-const UNLOCK_ALL = /[?&]unlock=all/.test(location.search);
-const unlocked = id => UNLOCK_ALL || id === 1 || (prog.stars[id - 1] || 0) >= 1;
+const UNLOCK_ALL = /[?&]unlock=all/.test(location.search) || location.hash === "#unlock";
+const unlocked = id => UNLOCK_ALL || prog.unlockAll || id === 1 || (prog.stars[id - 1] || 0) >= 1;
 const totalStars = () => Object.values(prog.stars).reduce((a, b) => a + b, 0);
 
 // ---- 入力 ----
@@ -519,6 +519,8 @@ function renderSelect() {
     if (m === prog.mode) b.classList.add("sel");
     b.onclick = () => { prog.mode = m; saveProg(); renderSelect(); }; modes.appendChild(b);
   });
+  const ua = $("unlockAll"); ua.textContent = prog.unlockAll ? "🔓 全ステージ解放中(テスト用)" : "🔒 全ステージを解放する(テスト用)";
+  ua.onclick = () => { prog.unlockAll = !prog.unlockAll; saveProg(); renderSelect(); };
   const go = $("stageGo"); go.disabled = !ok; go.textContent = ok ? "スタート" : "🔒 前のステージを★1以上でクリア";
   go.onclick = () => startStage(s.id, prog.mode);
 }
