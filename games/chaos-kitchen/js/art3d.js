@@ -21,6 +21,7 @@ const G3 = { ok: false };
 // 3D用の色(光が当たるので、2Dより少し濃くする)
 const P3 = { floorA: "#bfeed9", floorB: "#a8e3c8", hallA: "#ffdcbc", hallB: "#ffcba0", iceA: "#c4ecfb", iceB: "#aedff4", wood: "#d49c5e", woodTop: "#f4d196", wall: "#6a52a0", wall2: "#604896", under: "#79b9a2" };
 // ---- 共有の形・材質・絵 ----
+const CONEG = G3.ok && new THREE.CylinderGeometry(0, 1, 1, 20), HEMIG = G3.ok && new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), TRIG = G3.ok && new THREE.CylinderGeometry(1, 1, 1, 3);
 const BOXG = G3.ok && new THREE.BoxGeometry(1, 1, 1), CYLG = G3.ok && new THREE.CylinderGeometry(1, 1, 1, 28), SPHG = G3.ok && new THREE.SphereGeometry(1, 24, 16), PLANEG = G3.ok && new THREE.PlaneGeometry(1, 1);
 const matCache = new Map();
 function M(color, o = {}) {
@@ -100,7 +101,7 @@ function buildStatic(c, x, y, g) {
     counter3(g, px, pz, "#f4cf94");
     box(0.78, 0.34, 0.78, "#d79f5f", px, CTOP + 0.17, pz, g); box(0.84, 0.05, 0.84, PAL.woodLine, px, CTOP + 0.36, pz, g);
     box(0.7, 0.012, 0.7, "#8a5a30", px, CTOP + 0.34, pz, g, { cast: false });
-    spriteOf(emojiTex(ING[CRATE[t]].emoji), 0.8, px, CTOP + 0.78, pz + 0.02, g);
+    { const f = foodGroup(CRATE[t], "raw"); f.scale.setScalar(1.45); f.position.set(px, CTOP + 0.33, pz + 0.02); g.add(f); }
   } else if (t === "C") {
     counter3(g, px, pz); box(0.84, 0.07, 0.66, "#fff0c9", px, CTOP + 0.035, pz, g); box(0.84, 0.01, 0.06, "#c9a063", px, CTOP + 0.075, pz - 0.2, g, { cast: false });
     box(0.04, 0.02, 0.26, "#c8d0dd", px + 0.3, CTOP + 0.085, pz + 0.12, g, { cast: false }); box(0.04, 0.03, 0.12, PAL.woodLine, px + 0.3, CTOP + 0.09, pz + 0.3, g, { cast: false });
@@ -142,18 +143,101 @@ function buildStatic(c, x, y, g) {
   }
 }
 
+// ---- 食べ物の立体モデル(原点=底の中心、高さは約0.3まで) ----
+function seeded(n) { let a = n * 9301 + 49297; return () => { a = (a * 9301 + 49297) % 233280; return a / 233280; }; }
+function fpart(g, geo, color, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0, shine = false) {
+  const m = new THREE.Mesh(geo, M(color, shine ? { emissive: "#442222", emissiveIntensity: 0.15 } : undefined)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+}
+const S_ = (g, c, x, y, z, rx, ry, rz, ...r) => fpart(g, SPHG, c, x, y, z, rx, ry, rz, ...r);
+const FOOD = {
+  tomato: {
+    raw(g) { S_(g, "#e63b34", 0, 0.17, 0, 0.19, 0.165, 0.19); S_(g, "#ffd5d0", -0.07, 0.25, 0.1, 0.035, 0.03, 0.03); for (let i = 0; i < 5; i++) { const a = i * 1.257; fpart(g, SPHG, "#3f9b3a", Math.cos(a) * 0.06, 0.335, Math.sin(a) * 0.06, 0.07, 0.022, 0.03, 0, -a, 0.2); } fpart(g, CYLG, "#3f7f2e", 0, 0.37, 0, 0.014, 0.06, 0.014); },
+    chopped(g) { for (let i = 0; i < 4; i++) { fpart(g, CYLG, "#e63b34", -0.15 + i * 0.1, 0.1 + i * 0.012, 0.0, 0.14, 0.032, 0.14, 0, 0, 0.9); fpart(g, CYLG, "#ff9a90", -0.15 + i * 0.1, 0.1 + i * 0.012, 0.0, 0.1, 0.034, 0.1, 0, 0, 0.9); } },
+    cooked(g) { fpart(g, CYLG, "#ffffff", 0, 0.06, 0, 0.21, 0.12, 0.21); fpart(g, CYLG, "#e5483b", 0, 0.115, 0, 0.18, 0.02, 0.18); fpart(g, CYLG, "#ffe0c8", 0.04, 0.127, 0, 0.06, 0.01, 0.03); S_(g, "#3f9b3a", -0.06, 0.14, 0.05, 0.025, 0.02, 0.025); },
+  },
+  lettuce: {
+    raw(g) { S_(g, "#8fdc5f", 0, 0.16, 0, 0.17, 0.155, 0.17); for (let i = 0; i < 6; i++) { const a = i * 1.047; fpart(g, SPHG, i % 2 ? "#a8e87a" : "#6fc84a", Math.cos(a) * 0.1, 0.12 + (i % 2) * 0.05, Math.sin(a) * 0.1, 0.14, 0.05, 0.1, 0.5 * Math.sin(a), -a, -0.5 * Math.cos(a)); } },
+    chopped(g) { const r = seeded(3); for (let i = 0; i < 12; i++) { const a = r() * 6.28, d = r() * 0.15; fpart(g, BOXG, i % 3 ? "#7fd653" : "#a8e87a", Math.cos(a) * d, 0.025 + r() * 0.1, Math.sin(a) * d, 0.15, 0.022, 0.05, r(), r() * 3, r()); } },
+  },
+  onion: {
+    raw(g) { S_(g, "#e8c478", 0, 0.17, 0, 0.19, 0.17, 0.19); fpart(g, CONEG, "#cfa75a", 0, 0.38, 0, 0.06, 0.14, 0.06); fpart(g, CYLG, "#f4e6c0", 0, 0.015, 0, 0.05, 0.03, 0.05); },
+    chopped(g) { const r = seeded(5); for (let i = 0; i < 10; i++) { const a = r() * 6.28, d = r() * 0.14; fpart(g, BOXG, i % 2 ? "#f7edd0" : "#efe0f0", Math.cos(a) * d, 0.04 + r() * 0.06, Math.sin(a) * d, 0.075, 0.075, 0.075, r(), r() * 3, r()); } },
+    cooked(g) { const r = seeded(7); fpart(g, CYLG, "#ffffff", 0, 0.05, 0, 0.21, 0.1, 0.21); for (let i = 0; i < 10; i++) { const a = r() * 6.28, d = r() * 0.12; fpart(g, BOXG, i % 2 ? "#c78a3a" : "#e0a64e", Math.cos(a) * d, 0.12 + r() * 0.04, Math.sin(a) * d, 0.07, 0.05, 0.07, r(), r() * 3, r()); } },
+  },
+  carrot: {
+    raw(g) { fpart(g, CONEG, "#ff8c1a", 0.0, 0.1, 0, 0.09, 0.46, 0.09, 0, 0, Math.PI / 2); for (let i = 0; i < 3; i++) fpart(g, CONEG, "#3fa83a", 0.24, 0.12 + (i - 1) * 0.04, (i - 1) * 0.04, 0.03, 0.12, 0.03, 0, 0, -1.3 + (i - 1) * 0.35); },
+    chopped(g) { for (let i = 0; i < 5; i++) { fpart(g, CYLG, "#ff9a2e", -0.15 + i * 0.075, 0.1 + (i % 2) * 0.01, 0, 0.1, 0.034, 0.1, 0, 0, 1.0); fpart(g, CYLG, "#ffc26a", -0.15 + i * 0.075, 0.1 + (i % 2) * 0.01, 0, 0.06, 0.036, 0.06, 0, 0, 1.0); } },
+    cooked(g) { for (let i = 0; i < 5; i++) fpart(g, CYLG, "#e0701b", -0.14 + i * 0.07, 0.07, ((i % 2) - 0.5) * 0.08, 0.095, 0.045, 0.095, 0.1, 0, 0, shineAngle(i)); S_(g, "#ffd9a0", -0.05, 0.12, 0.02, 0.03, 0.02, 0.02); },
+  },
+  potato: {
+    raw(g) { S_(g, "#c79a5a", 0, 0.15, 0, 0.2, 0.14, 0.17, 0, 0, 0.15); S_(g, "#8a6a3a", 0.08, 0.2, 0.08, 0.025, 0.02, 0.02); S_(g, "#8a6a3a", -0.08, 0.17, 0.1, 0.02, 0.02, 0.02); S_(g, "#8a6a3a", 0.0, 0.26, -0.03, 0.02, 0.018, 0.02); },
+    chopped(g) { const r = seeded(11); for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = r() * 0.12; fpart(g, BOXG, "#f3dc8f", Math.cos(a) * d, 0.06 + (i % 3) * 0.045, Math.sin(a) * d, 0.1, 0.1, 0.1, r() * 0.6, r() * 3, r() * 0.6); } },
+    cooked(g) { const r = seeded(13); fpart(g, CYLG, "#ffffff", 0, 0.05, 0, 0.21, 0.1, 0.21); for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = r() * 0.1; fpart(g, BOXG, "#f7e6a8", Math.cos(a) * d, 0.12 + (i % 2) * 0.04, Math.sin(a) * d, 0.1, 0.09, 0.1, r() * 0.6, r() * 3, r() * 0.6); } },
+    fried(g) { const r = seeded(17); for (let i = 0; i < 10; i++) { const a = r() * 3.14; fpart(g, BOXG, i % 3 ? "#f1b92f" : "#e5a31c", (r() - 0.5) * 0.14, 0.06 + (i % 4) * 0.04, (r() - 0.5) * 0.14, 0.05, 0.05, 0.26, 0, a, r() * 0.3); } },
+    baked(g) { for (const dz of [-0.12, 0.12]) { fpart(g, HEMIG, "#b98245", 0, 0.03, dz, 0.2, 0.12, 0.1); fpart(g, CYLG, "#fff0c0", 0, 0.045, dz, 0.18, 0.02, 0.09); S_(g, "#ffd84a", 0, 0.065, dz, 0.05, 0.025, 0.04); } },
+  },
+  meat: {
+    raw(g) { fpart(g, BOXG, "#e0606c", 0, 0.045, 0, 0.42, 0.08, 0.3); for (let i = -1; i <= 1; i++) fpart(g, BOXG, "#ffe6e0", 0, 0.047, i * 0.09, 0.4, 0.083, 0.025); fpart(g, SPHG, "#ffc9c4", -0.1, 0.092, -0.04, 0.06, 0.012, 0.04); },
+    cooked(g) { fpart(g, BOXG, "#8b4a2b", 0, 0.06, 0, 0.42, 0.11, 0.3); for (let i = 0; i < 3; i++) fpart(g, BOXG, "#4a2412", -0.12 + i * 0.12, 0.118, 0, 0.035, 0.012, 0.34, 0, 0.6); S_(g, "#c47a4a", 0.1, 0.12, 0.06, 0.07, 0.012, 0.045); },
+  },
+  fish: {
+    raw(g) { S_(g, "#8fb7d8", 0, 0.1, 0, 0.26, 0.1, 0.1); S_(g, "#dce9f4", 0, 0.065, 0.02, 0.2, 0.05, 0.08); fpart(g, CONEG, "#6f9bc0", -0.28, 0.1, 0, 0.1, 0.14, 0.03, 0, 0, Math.PI / 2); fpart(g, CONEG, "#6f9bc0", 0, 0.2, 0, 0.07, 0.1, 0.02, 0, 0, 0.2); S_(g, "#ffffff", 0.17, 0.13, 0.08, 0.035, 0.035, 0.03); S_(g, "#222233", 0.19, 0.13, 0.095, 0.018, 0.018, 0.015); },
+    cooked(g) { S_(g, "#d28f45", 0, 0.1, 0, 0.26, 0.1, 0.1); for (let i = 0; i < 3; i++) fpart(g, BOXG, "#8a4f22", -0.08 + i * 0.09, 0.19, 0, 0.025, 0.012, 0.15, 0, 0.3, 0); fpart(g, CONEG, "#b97a3a", -0.28, 0.1, 0, 0.1, 0.14, 0.03, 0, 0, Math.PI / 2); S_(g, "#ffffff", 0.17, 0.13, 0.08, 0.03, 0.03, 0.03); },
+    fried(g) { S_(g, "#eaa93a", 0, 0.08, 0, 0.27, 0.075, 0.14); const r = seeded(19); for (let i = 0; i < 6; i++) S_(g, i % 2 ? "#f6c25a" : "#d9962a", (r() - 0.5) * 0.3, 0.12, (r() - 0.5) * 0.14, 0.05, 0.035, 0.05); },
+    baked(g) { S_(g, "#cf8f4f", 0, 0.09, 0, 0.26, 0.09, 0.1); for (let i = 0; i < 4; i++) S_(g, "#4caf50", -0.1 + i * 0.07, 0.17, 0.02, 0.022, 0.012, 0.015); fpart(g, CONEG, "#b97a3a", -0.28, 0.1, 0, 0.1, 0.14, 0.03, 0, 0, Math.PI / 2); },
+  },
+  egg: {
+    raw(g) { S_(g, "#fff7ea", 0, 0.18, 0, 0.14, 0.18, 0.14); S_(g, "#ffffff", -0.05, 0.25, 0.07, 0.03, 0.04, 0.025); },
+    cooked(g) { fpart(g, CYLG, "#ffffff", -0.03, 0.02, 0, 0.2, 0.035, 0.18); fpart(g, CYLG, "#ffffff", 0.08, 0.02, 0.06, 0.12, 0.035, 0.1); S_(g, "#ffb400", 0.0, 0.05, 0, 0.085, 0.06, 0.085); S_(g, "#ffe27a", -0.03, 0.09, 0.03, 0.02, 0.012, 0.015); },
+  },
+  rice: {
+    raw(g) { fpart(g, HEMIG, "#f3ecd6", 0, 0.0, 0, 0.19, 0.12, 0.19); const r = seeded(23); for (let i = 0; i < 9; i++) { const a = r() * 6.28, d = r() * 0.13; S_(g, "#fffaf0", Math.cos(a) * d, 0.04 + (0.12 - d * 0.6), Math.sin(a) * d, 0.04, 0.025, 0.025, 0, r() * 3, 0); } },
+    cooked(g) { fpart(g, CYLG, "#ffffff", 0, 0.07, 0, 0.21, 0.14, 0.21); fpart(g, CYLG, "#4a8fd8", 0, 0.06, 0, 0.215, 0.035, 0.215); fpart(g, HEMIG, "#ffffff", 0, 0.14, 0, 0.19, 0.13, 0.19); const r = seeded(29); for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = r() * 0.12; S_(g, "#fffdf6", Math.cos(a) * d, 0.16 + (0.1 - d * 0.5), Math.sin(a) * d, 0.035, 0.022, 0.022, 0, r() * 3, 0); } },
+  },
+  bread: {
+    raw(g) { fpart(g, CYLG, "#e8b565", 0, 0.04, 0, 0.21, 0.08, 0.21); fpart(g, HEMIG, "#e2a04e", 0, 0.08, 0, 0.22, 0.17, 0.22); const r = seeded(31); for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = r() * 0.12; S_(g, "#fff1cc", Math.cos(a) * d, 0.2 - d * 0.5, Math.sin(a) * d, 0.028, 0.012, 0.016, 0, r() * 3, 0); } },
+  },
+  cheese: {
+    raw(g) { fpart(g, TRIG, "#ffd23f", 0, 0.09, 0, 0.24, 0.17, 0.24, 0, Math.PI / 6, 0); for (const [x, z] of [[-0.05, 0.02], [0.06, -0.04], [0.02, 0.08]]) fpart(g, CYLG, "#e8b52a", x, 0.18, z, 0.04, 0.012, 0.04); },
+    chopped(g) { for (let i = 0; i < 3; i++) fpart(g, BOXG, i % 2 ? "#ffd84d" : "#ffe27a", 0, 0.03 + i * 0.03, 0, 0.27, 0.026, 0.27, 0, 0.35 * i, 0); },
+    baked(g) { fpart(g, CYLG, "#f5b53a", 0, 0.025, 0, 0.23, 0.05, 0.23); const r = seeded(37); for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = r() * 0.14; S_(g, i % 2 ? "#ffd36a" : "#e89a2a", Math.cos(a) * d, 0.06, Math.sin(a) * d, 0.045, 0.03, 0.045); } },
+  },
+  mushroom: {
+    raw(g) { fpart(g, CYLG, "#f3e4d0", 0, 0.085, 0, 0.065, 0.17, 0.065); fpart(g, HEMIG, "#c58a5c", 0, 0.15, 0, 0.21, 0.15, 0.21); fpart(g, CYLG, "#e8cfae", 0, 0.15, 0, 0.19, 0.012, 0.19); },
+    chopped(g) { for (let i = 0; i < 4; i++) { const x = -0.14 + i * 0.09; fpart(g, BOXG, "#c58a5c", x, 0.1, 0, 0.1, 0.04, 0.08, 0, 0, 0.2); fpart(g, BOXG, "#f3e4d0", x, 0.05, 0, 0.04, 0.09, 0.07, 0, 0, 0.2); } },
+    cooked(g) { for (let i = 0; i < 4; i++) { const x = -0.14 + i * 0.09; fpart(g, BOXG, "#8f5b36", x, 0.1, 0, 0.1, 0.04, 0.08, 0, 0, 0.2); fpart(g, BOXG, "#d9bf9a", x, 0.05, 0, 0.04, 0.09, 0.07, 0, 0, 0.2); } },
+    baked(g) { for (let i = 0; i < 4; i++) { const x = -0.14 + i * 0.09; fpart(g, BOXG, "#a56a3a", x, 0.1, 0, 0.1, 0.04, 0.08, 0, 0, 0.2); fpart(g, BOXG, "#e0c9a6", x, 0.05, 0, 0.04, 0.09, 0.07, 0, 0, 0.2); S_(g, "#ffd36a", x, 0.13, 0, 0.03, 0.015, 0.03); } },
+  },
+};
+function shineAngle(i) { return 0.15 * (i % 2 ? 1 : -1); }
+const foodCache = new Map();
+function foodGroup(type, state) {                         // 食べ物の立体(同じ見た目は作った型を使い回す)
+  const key = type + ":" + state; let tpl = foodCache.get(key);
+  if (!tpl) {
+    tpl = new THREE.Group(); const b = FOOD[type] && (FOOD[type][state] || FOOD[type].raw);
+    if (b) b(tpl); else S_(tpl, "#cccccc", 0, 0.15, 0, 0.15, 0.15, 0.15);
+    foodCache.set(key, tpl);
+  }
+  return tpl.clone();
+}
+const tagTex = state => cachedTex("t" + state, 96, 64, (c) => {
+  c.beginPath(); c.roundRect(6, 8, 84, 48, 22); c.fillStyle = TAG_COL[state]; c.fill(); c.lineWidth = 6; c.strokeStyle = "#fff"; c.stroke();
+  c.font = "800 34px sans-serif"; c.fillStyle = PAL.ink; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(STATE_TAG[state], 48, 34);
+});
+
 // 動く部分(アイテム・鍋の中身・お客さん)。状態が変わったときだけ作り直す
 function buildItem3(it, g, s = 1) {
   if (!it) return;
   if (it.kind === "dirty") { cyl(0.3 * s, 0.04, "#cdb89a", 0, 0.02, 0, g); cyl(0.2 * s, 0.045, "#b9a283", 0, 0.025, 0, g, { cast: false }); spriteOf(emojiTex("💧"), 0.3 * s, 0.14 * s, 0.22, 0.05, g); return; }
   if (it.kind === "plate") {
     cyl(0.31 * s, 0.04, "#ffffff", 0, 0.02, 0, g); cyl(0.2 * s, 0.045, "#e6eeff", 0, 0.025, 0, g, { cast: false });
-    const n = it.contents.length, sp = n > 2 ? 0.24 : 0.3;
-    it.contents.forEach((c, i) => spriteOf(itemTex(c.type, c.state), (n > 2 ? 0.36 : 0.44) * s, (i - (n - 1) / 2) * sp * s, 0.3 * s, 0.02, g));
+    const n = it.contents.length, pos = n === 1 ? [[0, 0]] : n === 2 ? [[-0.12, 0.02], [0.12, 0.02]] : [[-0.14, 0.08], [0.14, 0.08], [0, -0.13]], sc = (n === 1 ? 0.95 : n === 2 ? 0.66 : 0.52) * s;
+    it.contents.forEach((c, i) => { const f = foodGroup(c.type, c.state); f.scale.setScalar(sc); f.position.set(pos[i][0] * s, 0.045 * s, pos[i][1] * s); g.add(f); });
     return;
   }
-  const sh = new THREE.Mesh(PLANEG, M("#3a2b57", { transparent: true, opacity: 0.22 })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.01; sh.scale.set(0.38 * s, 0.38 * s, 1); g.add(sh);
-  spriteOf(itemTex(it.type, it.state), 0.62 * s, 0, 0.36 * s, 0, g);
+  const sh = new THREE.Mesh(PLANEG, M("#3a2b57", { transparent: true, opacity: 0.22 })); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.01; sh.scale.set(0.4 * s, 0.4 * s, 1); g.add(sh);
+  const f = foodGroup(it.type, it.state); f.scale.setScalar(1.15 * s); g.add(f);
+  if (it.state !== "raw") spriteOf(tagTex(it.state), 0.3 * s, 0.24 * s, 0.4 * s, 0.1, g);
 }
 const itemSig = it => !it ? "-" : it.kind === "plate" ? "p" + it.contents.map(x => x.type + x.state).join() : it.kind === "dirty" ? "d" : it.type + it.state;
 function dynSig(c) {
@@ -176,7 +260,7 @@ function buildDyn(c, g) {
       } else if (t === "F") { box(0.5, 0.18, 0.04, burnt ? "#25222d" : "#9aa3b8", 0, 0.26, 0.0, g); }
       else if (c.stove === "cooking" || c.stove === "done") { const gl = new THREE.Mesh(BOXG, new THREE.MeshBasicMaterial({ color: 0xffd27a })); gl.position.set(0, 0.34, 0.405); gl.scale.set(0.5, 0.26, 0.02); g.add(gl); }
     }
-    if (c.sitem && act) spriteOf(itemTex(c.sitem.type, c.stove === "done" ? c.res : "raw"), 0.6, 0, 0.78, -0.04, g);
+    if (c.sitem && act) { const f = foodGroup(c.sitem.type, c.stove === "done" ? c.res : c.sitem.state); f.scale.setScalar(0.72); f.position.set(0, t === "S" ? 0.46 : t === "F" ? 0.38 : 0.1, t === "V" ? 0.0 : -0.04); if (t === "V") f.position.y = 0.2; g.add(f); if (t === "V") { /* オーブンの中は見えないので上に出す */ f.position.set(0, 0.74, -0.02); } }
     if (c.stove === "done") spriteOf(emojiTex("✅"), 0.4, 0.3, 1.1, 0.1, g);
     if (burnt) spriteOf(emojiTex("🔥"), 0.7, 0, 0.75, 0, g);
     return;
@@ -197,7 +281,7 @@ function buildDyn(c, g) {
   buildItem3(c.item, g);
 }
 
-const sharedGeos = G3.ok ? new Set([BOXG, CYLG, SPHG, PLANEG]) : null;
+const sharedGeos = G3.ok ? new Set([BOXG, CYLG, SPHG, PLANEG, CONEG, HEMIG, TRIG]) : null;
 function disposeObj(o) {                                    // 共有の形・材質は残し、その場で作ったものだけ捨てる
   o.traverse(n => {
     if (n.isSprite) n.material.dispose();
