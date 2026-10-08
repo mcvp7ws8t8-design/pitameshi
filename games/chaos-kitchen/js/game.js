@@ -27,14 +27,40 @@ let ev = null, evNext = 25, banner = { txt: "", t: 0 }, lastSec = -1;
 const dark = document.createElement("canvas");
 
 // ---- 進み具合の保存 ----
-let prog = { stars: {}, best: {}, mode: 3 };
+let prog = { stars: {}, best: {}, setup: { humans: 1, ai: 1 } };
 try { Object.assign(prog, JSON.parse(localStorage.getItem("ck-prog") || "{}")); } catch {}
+if (prog.mode && !(prog.setup && prog.setup.humans)) prog.setup = legacySetup(prog.mode);     // 古い保存データを引き継ぐ
+function legacySetup(m) { return m === 2 ? { humans: 2, ai: 0 } : m >= 3 ? { humans: 1, ai: m - 2 } : { humans: 1, ai: 0 }; }
 const saveProg = () => { try { localStorage.setItem("ck-prog", JSON.stringify(prog)); } catch {} };
 const UNLOCK_ALL = /[?&]unlock=all/.test(location.search) || location.hash === "#unlock";
 const unlocked = id => UNLOCK_ALL || prog.unlockAll || id === 1 || (prog.stars[id - 1] || 0) >= 1;
 const totalStars = () => Object.values(prog.stars).reduce((a, b) => a + b, 0);
 
 // ---- 入力 ----
+const KB1 = { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", act: "KeyE", chop: "KeyQ" };
+const KB2 = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", act: "Period", chop: "Comma" };
+const HCOL = ["#e8504a", "#4a8be8", "#f2b632", "#27b7b0"];
+let PADS = []; const padPrev = {};
+const connectedPads = () => [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(g => g && g.connected).map(g => g.index);
+function pollPads() {                                  // 毎フレームのコントローラーの状態(押した瞬間 edge も)
+  const out = [];
+  for (const g of (navigator.getGamepads ? navigator.getGamepads() : [])) {
+    if (!g || !g.connected) continue;
+    const b = g.buttons.map(x => x.pressed), prev = padPrev[g.index] || [], edge = b.map((v, i) => v && !prev[i]); padPrev[g.index] = b;
+    let ax = g.axes[0] || 0, ay = g.axes[1] || 0; if (Math.hypot(ax, ay) < 0.3) ax = ay = 0;
+    if (b[14]) ax = -1; if (b[15]) ax = 1; if (b[12]) ay = -1; if (b[13]) ay = 1;
+    out.push({ index: g.index, ax, ay, b, edge });
+  }
+  return out;
+}
+// 人間のプレイヤーごとに操作方法を割り当てる: コントローラーが先、足りなければキーボード(WASD → 矢印)
+function assignInputs(h) {
+  const pads = connectedPads(), kb = [KB1, KB2], out = [];
+  for (let i = 0; i < h; i++) out.push(pads[i] !== undefined ? { pad: pads[i] } : { keys: kb.shift() });
+  if (out[0] && out[0].pad !== undefined && kb[0] === KB1) out[0].keys = KB1;     // 1Pはコントローラーとキーボードどちらでも
+  return out;
+}
+const maxHumans = () => Math.min(4, connectedPads().length + 2);
 const keys = new Set();
 addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
@@ -47,7 +73,7 @@ addEventListener("keydown", e => {
 addEventListener("keyup", e => keys.delete(e.code));
 
 // ---- ステージ開始 ----
-function startStage(id, mode) {
+function startStage(id, setup) {
   stage = STAGES[id - 1];
   let tid = 0;
   tiles = stage.map.map((row, y) => [...row].map((t, x) => ({
@@ -63,10 +89,10 @@ function startStage(id, mode) {
   view = { sc, ox: (MAPW - W * T * sc) / 2, oy: (MAPH - H * T * sc) / 2 };
   dark.width = W * T; dark.height = H * T;
   plates = stage.plates; platePending = [];
-  const humans = mode === 2 ? 2 : 1;
-  const nAi = Math.min(3, Math.max(mode >= 3 ? mode - 2 : 0, stage.minPlayers - humans));
-  players = [{ x: 0, y: 0, dir: [0, 1], item: null, col: "#e8504a", keys: { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", act: "KeyE", chop: "KeyQ" } }];
-  if (humans === 2) players.push({ x: 0, y: 0, dir: [0, 1], item: null, col: "#4a8be8", keys: { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", act: "Period", chop: "Comma" } });
+  if (typeof setup === "number") setup = legacySetup(setup);
+  let humans = Math.max(1, Math.min(maxHumans(), setup.humans || 1)), nAi = Math.max(0, Math.min(3, setup.ai || 0));
+  nAi = Math.min(nAi, 4 - humans); while (humans + nAi < stage.minPlayers && humans + nAi < 4) nAi++;
+  players = assignInputs(humans).map((inp, i) => ({ x: 0, y: 0, dir: [0, 1], item: null, col: HCOL[i], keys: inp.keys, pad: inp.pad }));
   for (let i = 0; i < nAi; i++) players.push(newBot(i));
   players.forEach((p, i) => { [p.x, p.y] = stage.spawns[i]; });
   spawnEvery = Math.max(7, Math.round(stage.spawn * 4.5 / (nAi + 1.5 * humans)));   // 人手が多いほど、お客は早く来る
@@ -77,7 +103,8 @@ function startStage(id, mode) {
   served = 0; orders = []; score = 0; popups = []; timeLeft = stage.time; spawnIn = 0; ev = null; banner.t = 0;
   evNext = stage.events.length ? stage.evGap * 0.8 : 1e9;
   introT = stage.tip ? 5 : 3; paused = false; state = "play";
-  prog.mode = mode; saveProg();
+  prog.setup = { humans, ai: nAi }; saveProg();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   setupAiUi(nAi);
   Snd.play("click"); Snd.music({ world: stage.world });
   showScreen(null); $("pauseBtn").style.display = "block";
@@ -196,6 +223,8 @@ const isEv = n => ev && ev.type === n;
 const ordCap = () => Math.min(6, 3 + players.filter(p => p.ai).length) + (isEv("rush") ? 2 : 0);
 
 function update(dt) {
+  PADS = pollPads();
+  if (PADS.some(g => g.edge[9])) { setPause(true); return; }                 // Start=ポーズ
   if (introT > 0) { introT -= dt; if (introT <= 0) Snd.play("go"); return; }
   timeLeft -= dt;
   const sec = Math.ceil(timeLeft); if (sec !== lastSec) { if (sec <= 10 && sec > 0) Snd.play("tick"); lastSec = sec; }
@@ -236,8 +265,10 @@ function update(dt) {
     const on = tiles[Math.floor(p.y)] && tiles[Math.floor(p.y)][Math.floor(p.x)];
     if (on && ARROW[on.t] && !p.ai) moveBy(p, ARROW[on.t][0] * 1.6 * dt, ARROW[on.t][1] * 1.6 * dt);      // ベルトコンベア(AIは流されない)
     if (p.ai) { botUpdate(p, dt); work(p, target(p), p.chopping, dt); trackMove(p, ox, oy, dt); continue; }
-    let dx = (keys.has(p.keys.right) ? 1 : 0) - (keys.has(p.keys.left) ? 1 : 0);
-    let dy = (keys.has(p.keys.down) ? 1 : 0) - (keys.has(p.keys.up) ? 1 : 0);
+    const K = p.keys, gp = p.pad !== undefined ? PADS.find(g => g.index === p.pad) : null;
+    let dx = K ? (keys.has(K.right) ? 1 : 0) - (keys.has(K.left) ? 1 : 0) : 0;
+    let dy = K ? (keys.has(K.down) ? 1 : 0) - (keys.has(K.up) ? 1 : 0) : 0;
+    if (gp) { if (!dx) dx = gp.ax; if (!dy) dy = gp.ay; if (gp.edge[0] || gp.edge[3]) interact(p); }          // 下ボタン・上ボタン=つかむ/置く
     if (!dx && !dy && p === players[0] && Math.hypot(joy.x, joy.y) > 0.3) { dx = joy.x; dy = joy.y; }
     let tvx = 0, tvy = 0;
     if (dx || dy) {
@@ -248,7 +279,7 @@ function update(dt) {
       const k = Math.min(1, 2.2 * dt); p.vx = (p.vx || 0) + (tvx - (p.vx || 0)) * k; p.vy = (p.vy || 0) + (tvy - (p.vy || 0)) * k;
     } else { p.vx = tvx; p.vy = tvy; }
     if (p.vx || p.vy) moveBy(p, p.vx * dt, p.vy * dt);
-    work(p, target(p), keys.has(p.keys.chop) || (p === players[0] && touchChop), dt);
+    work(p, target(p), (K && keys.has(K.chop)) || (gp && (gp.b[2] || gp.b[1])) || (p === players[0] && touchChop), dt);   // 左・右ボタン長押し=切る/洗う
     trackMove(p, ox, oy, dt);
   }
   for (const row of tiles) for (const c of row) {
@@ -319,11 +350,59 @@ function finishStage() {
   showResult();
 }
 
+// ---- メニューの操作(キーボードの矢印・コントローラーの十字キー/スティック) ----
+function navButtons() {
+  if ($("ui").style.display === "none") return [];
+  const scr = [...document.querySelectorAll("#ui .scr")].find(e => e.style.display !== "none"); if (!scr) return [];
+  return [...scr.querySelectorAll("button")].filter(b => !b.disabled && b.offsetParent !== null);
+}
+function focusDefault() {
+  const bs = navButtons(); if (!bs.length) return;
+  const b = bs.find(x => x.classList.contains("go")) || bs.find(x => x.classList.contains("sel")) || bs[0]; b.focus({ preventScroll: true });
+}
+function navMove(dx, dy) {
+  document.body.classList.add("padnav");
+  const bs = navButtons(); if (!bs.length) return;
+  const cur = document.activeElement; if (!bs.includes(cur)) { focusDefault(); return; }
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let best = null, bd = 1e9;
+  for (const b of bs) {
+    if (b === cur) continue; const q = b.getBoundingClientRect(), vx = q.left + q.width / 2 - cx, vy = q.top + q.height / 2 - cy, along = vx * dx + vy * dy;
+    if (along <= 4) continue; const score = along + (Math.abs(vx * dy) + Math.abs(vy * dx)) * 2.4; if (score < bd) { bd = score; best = b; }
+  }
+  if (best) { best.focus({ preventScroll: true }); best.scrollIntoView({ block: "nearest", inline: "nearest" }); Snd.play("click"); }
+}
+function navBack() {
+  if (paused) { setPause(false); return; }
+  const scr = [...document.querySelectorAll("#ui .scr")].find(e => e.style.display !== "none"); if (!scr) return;
+  if (scr.id === "scr-select") $("selBack").click(); else if (scr.id === "scr-result") $("resSelect").click();
+}
+let navT = 0, navDir = "";
+function padMenu(dt) {                                       // ポーズ中・メニュー中のコントローラー操作
+  const pads = pollPads(); PADS = pads;
+  if (!pads.length) { navDir = ""; return; }
+  if (pads.some(g => g.edge[9]) && paused) { setPause(false); return; }
+  if (pads.some(g => g.edge[0])) { document.body.classList.add("padnav"); const f = document.activeElement; if (f && f.tagName === "BUTTON" && navButtons().includes(f)) f.click(); else focusDefault(); return; }
+  if (pads.some(g => g.edge[1])) { navBack(); return; }
+  const g = pads.find(q => q.ax || q.ay), dir = g ? (Math.abs(g.ax) >= Math.abs(g.ay) ? (g.ax < 0 ? "L" : "R") : (g.ay < 0 ? "U" : "D")) : "";
+  navT -= dt;
+  if (dir && (dir !== navDir || navT <= 0)) { navMove(dir === "L" ? -1 : dir === "R" ? 1 : 0, dir === "U" ? -1 : dir === "D" ? 1 : 0); navT = dir !== navDir ? 0.35 : 0.14; }
+  navDir = dir;
+}
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || (state === "play" && !paused)) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+  if (d) { navMove(d[0], d[1]); e.preventDefault(); }
+  else if (e.code === "Escape" && state !== "play") navBack();
+  else if (e.code === "Enter" && !navButtons().includes(document.activeElement)) { focusDefault(); }
+});
+["pointerdown", "mousemove"].forEach(ev => addEventListener(ev, () => document.body.classList.remove("padnav")));
+
 // ---- 画面(ホーム・ステージ選択・結果・ポーズ) ----
 const SCREENS = ["home", "select", "result", "pause"];
 function showScreen(name) {
   SCREENS.forEach(s => { $("scr-" + s).style.display = s === name ? "flex" : "none"; });
   $("ui").style.display = name ? "flex" : "none";
+  if (name && !matchMedia("(pointer:coarse)").matches) setTimeout(focusDefault, 30);
   if (name === "home" || name === "select") { Snd.music({ menu: true, world: selWorld }); state = name; $("touch").style.display = "none"; $("aiUi").style.display = "none"; $("pauseBtn").style.display = "none"; }
 }
 function setPause(v) { paused = v; showScreen(v ? "pause" : null); if (v) $("ui").style.display = "flex"; keys.clear(); }
@@ -335,6 +414,21 @@ function renderHome() {
   const next = STAGES.find(s => unlocked(s.id) && !(prog.stars[s.id] > 0)) || STAGES[STAGES.length - 1];
   $("homeContinue").textContent = `つづきから(${next.world}-${next.k} ${next.name})`;
   $("homeContinue").onclick = () => { selWorld = next.world; selStage = next.id; renderSelect(); showScreen("select"); };
+}
+// 人数: 人間 1〜4(コントローラーの数+キーボード2人まで) + AI 0〜3(合計4人まで)
+function renderSetup(s) {
+  const mh = maxHumans(); let { humans, ai } = prog.setup;
+  humans = Math.max(1, Math.min(mh, humans)); ai = Math.max(0, Math.min(4 - humans, ai));
+  while (humans + ai < s.minPlayers && ai < 4 - humans) ai++;
+  prog.setup = { humans, ai };
+  const mk = (id, vals, cur, disabled, label, set) => {
+    const box = $(id); box.innerHTML = "";
+    vals.forEach(v => { const b = document.createElement("button"); b.textContent = label(v); b.disabled = disabled(v); if (v === cur) b.classList.add("sel"); b.onclick = () => { set(v); saveProg(); Snd.play("click"); renderSelect(); }; box.appendChild(b); });
+  };
+  mk("humanPick", [1, 2, 3, 4], humans, v => v > mh || v + Math.max(0, s.minPlayers - v) > 4, v => "👨‍🍳".repeat(v) , v => { prog.setup.humans = v; });
+  mk("aiPick", [0, 1, 2, 3], ai, v => humans + v > 4 || humans + v < s.minPlayers, v => v ? "🤖".repeat(v) : "なし", v => { prog.setup.ai = v; });
+  const pads = connectedPads().length, dev = assignInputs(humans).map((d, i) => `${i + 1}P ${d.pad !== undefined ? "🎮コントローラー" : (d.keys === KB1 ? "⌨️ WASD" : "⌨️ 矢印")}${i === 0 && d.pad !== undefined && d.keys ? "+⌨️" : ""}`).join("　");
+  $("devLine").textContent = `${dev}　(コントローラー ${pads}台)${pads === 0 ? " ボタンを押すと認識します" : ""}`;
 }
 function renderSelect() {
   const wc = WORLD_COL[selWorld - 1], ui = $("scr-select"); ui.style.setProperty("--wc", wc);
@@ -363,17 +457,11 @@ function renderSelect() {
     <div><span class="tag">⏱ ${s.time}秒</span>${s.label ? `<span class="tag">${s.label}</span>` : ""}${s.gimmicks.map(g => `<span class="tag">${g}</span>`).join("")}${s.minPlayers > 1 ? '<span class="tag">👥 2人以上</span>' : ""}</div>
     <div style="margin-top:4px">${dishes}</div>${s.tip ? `<div class="tip">💡 ${s.tip}</div>` : ""}
     <div class="goal">ベスト: ${prog.best[s.id] ?? "-"}</div>`;
-  const modes = $("modePick"); modes.innerHTML = "";
-  [[1, "👨‍🍳 ひとり"], [2, "👥 ふたり"], [3, "🤖 AI1人"], [4, "🤖🤖 AI2人"], [5, "🤖🤖🤖 AI3人"]].forEach(([m, label]) => {
-    const b = document.createElement("button"); b.textContent = label;
-    if (m === 2) b.classList.add("kbonly");
-    if (m === prog.mode) b.classList.add("sel");
-    b.onclick = () => { prog.mode = m; saveProg(); Snd.play("click"); renderSelect(); }; modes.appendChild(b);
-  });
+  renderSetup(s);
   const ua = $("unlockAll"); ua.textContent = prog.unlockAll ? "🔓 全ステージ解放中(テスト用)" : "🔒 全ステージを解放する(テスト用)";
   ua.onclick = () => { prog.unlockAll = !prog.unlockAll; saveProg(); renderSelect(); };
   const go = $("stageGo"); go.disabled = !ok; go.textContent = ok ? "スタート!" : "🔒 前のステージを★1でクリア";
-  go.onclick = () => startStage(s.id, prog.mode);
+  go.onclick = () => startStage(s.id, prog.setup);
 }
 function confetti() {
   for (let i = 0; i < 46; i++) {
@@ -392,8 +480,8 @@ function showResult() {
   $("resGoals").textContent = `★1: ${goals[0]}　★2: ${goals[1]}　★3: ${goals[2]}`;
   const nextOk = r.id < STAGES.length && unlocked(r.id + 1);
   $("resNext").style.display = nextOk ? "" : "none";
-  $("resNext").onclick = () => startStage(r.id + 1, prog.mode);
-  $("resRetry").onclick = () => startStage(r.id, prog.mode);
+  $("resNext").onclick = () => startStage(r.id + 1, prog.setup);
+  $("resRetry").onclick = () => startStage(r.id, prog.setup);
   $("resSelect").onclick = () => { selWorld = s.world; selStage = r.id; renderSelect(); showScreen("select"); };
   $("resMsg").textContent = r.stars === 0 ? "あと少し! もう一度挑戦しよう" : (r.firstClear && r.id < STAGES.length ? `ステージ${r.id + 1}が解放されたよ!` : "");
   showScreen("result");
@@ -422,6 +510,7 @@ $("actBtn").addEventListener("pointerdown", e => { e.preventDefault(); if (state
 const chopBtn = $("chopBtn");
 chopBtn.addEventListener("pointerdown", e => { e.preventDefault(); chopBtn.setPointerCapture(e.pointerId); touchChop = true; });
 ["pointerup", "pointercancel"].forEach(t => chopBtn.addEventListener(t, () => { touchChop = false; }));
+$("fsBtn").onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
 let shownState = "";
 function syncUi() {
   const key = state + paused;
