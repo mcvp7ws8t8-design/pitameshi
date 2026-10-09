@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
-import { DISHES, type GameSnapshot } from "../shared/game";
+import { type GameSnapshot } from "../shared/game";
+import { dishName, drinkName } from "../shared/menu";
 import { nearestTarget } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { buildAvatar, buildRestaurant } from "./scene";
@@ -120,7 +121,6 @@ function onState(list: PlayerSnapshot[]) {
 }
 
 // ---- ゲームの表示 ----
-const dishName = (d: keyof typeof DISHES) => DISHES[d].name;
 
 function onGame(g: GameSnapshot) {
   const prevPhase = game?.phase;
@@ -137,25 +137,32 @@ function onGame(g: GameSnapshot) {
 function renderSide(g: GameSnapshot) {
   const lines: string[] = [];
   const mine = g.tickets;
-  if (myRole === "kitchen") {
-    const news = mine.filter((t) => t.status === "new");
-    lines.push(`<b>注文(${news.length})</b>  <span class="dim">[R]で切り替え</span>`);
+  const name = (t: GameSnapshot["tickets"][number]) => (t.kind === "food" ? dishName(t.item) : drinkName(t.item));
+  const list = (kind: "food" | "drink", sel: number | null) => {
+    const news = mine.filter((t) => t.kind === kind && t.status === "new");
+    lines.push(`<b>${kind === "food" ? "料理" : "ドリンク"}の注文(${news.length})</b>  <span class="dim">[R]で切り替え</span>`);
     for (const t of news.slice(0, 8)) {
-      lines.push(`<span class="${t.id === g.selected ? "sel" : ""}">${t.id === g.selected ? "▶ " : ""}席${t.seat + 1} ${dishName(t.dish)}</span>`);
+      lines.push(`<span class="${t.id === sel ? "sel" : ""}">${t.id === sel ? "▶ " : ""}席${t.seat + 1} ${name(t)}</span>`);
     }
     if (news.length > 8) lines.push(`<span class="dim">…ほか${news.length - 8}件</span>`);
-    g.stoves.forEach((id, i) => {
+  };
+  const slot = (label: string, ids: (number | null)[]) =>
+    ids.forEach((id, i) => {
       const t = id === null ? undefined : mine.find((x) => x.id === id);
-      lines.push(`コンロ${i + 1}: ${t ? `席${t.seat + 1} ${dishName(t.dish)} ${t.status === "ready" ? "✔できた" : "調理中"}` : "空き"}`);
+      lines.push(`${label}${i + 1}: ${t ? `席${t.seat + 1} ${name(t)} ${t.status === "ready" ? "✔できた" : "作成中"}` : "空き"}`);
     });
+  if (myRole === "kitchen") {
+    list("food", g.selFood);
+    slot("コンロ", g.stoves);
     const held = mine.filter((t) => t.status === "kitchen");
-    lines.push(`持っている: ${held.map((t) => `席${t.seat + 1} ${dishName(t.dish)}`).join("、") || "なし"}`);
+    lines.push(`持っている: ${held.map((t) => `席${t.seat + 1} ${name(t)}`).join("、") || "なし"}`);
   } else {
+    list("drink", g.selDrink);
+    slot("ドリンクバー", g.bars);
     const held = mine.filter((t) => t.status === "hall");
-    lines.push(`<b>トレー(${held.length}/3)</b>`);
-    for (const t of held) lines.push(`席${t.seat + 1} ${dishName(t.dish)}`);
-    lines.push(`受け渡し台: ${mine.filter((t) => t.status === "pass").length}つ`);
-    lines.push(`調理待ち: ${mine.filter((t) => t.status === "new" || t.status === "cooking").length}件`);
+    lines.push(`<b>トレー(${held.length}/4)</b>`);
+    for (const t of held) lines.push(`席${t.seat + 1} ${name(t)}`);
+    lines.push(`受け渡し台の料理: ${mine.filter((t) => t.status === "pass").length}つ`);
   }
   $("side").innerHTML = lines.join("<br>");
 }
@@ -177,22 +184,22 @@ function promptText(): string {
   const target = nearestTarget(myRole, me.x, me.z);
   if (!target) return "";
   const tickets = game.tickets;
+  const name = (t: GameSnapshot["tickets"][number]) => (t.kind === "food" ? dishName(t.item) : drinkName(t.item));
   if (target.kind === "seat") {
     const s = game.seats[target.i];
     if (!s) return "";
     if (s.s === "waitOrder") return `[E] 席${target.i + 1}の注文を取る`;
-    if (s.s === "waitFood") {
-      const t = tickets.find((x) => x.seat === target.i && x.status === "hall");
-      return t ? `[E] ${dishName(t.dish)}を出す` : "料理待ち";
-    }
-    return "食事中";
+    const held = tickets.filter((x) => x.seat === target.i && x.status === "hall");
+    if (held.length > 0) return `[E] ${held.map(name).join("・")}を出す`;
+    return s.s === "waitFood" ? "料理もドリンクも持っていません" : "食事中";
   }
-  if (target.kind === "stove") {
-    const id = game.stoves[target.i];
+  if (target.kind === "stove" || target.kind === "bar") {
+    const isBar = target.kind === "bar";
+    const id = (isBar ? game.bars : game.stoves)[target.i];
     const t = id === null || id === undefined ? undefined : tickets.find((x) => x.id === id);
-    if (t) return t.status === "ready" ? `[E] ${dishName(t.dish)}を取る` : "調理中";
-    const sel = tickets.find((x) => x.id === game!.selected);
-    return sel ? `[E] 席${sel.seat + 1}の${dishName(sel.dish)}を作る` : "注文がありません";
+    if (t) return t.status === "ready" ? `[E] ${name(t)}を取る` : "作成中";
+    const sel = tickets.find((x) => x.id === (isBar ? game!.selDrink : game!.selFood));
+    return sel ? `[E] 席${sel.seat + 1}の${name(sel)}を作る` : "注文がありません";
   }
   if (myRole === "hall") return tickets.some((t) => t.status === "pass") ? "[E] 受け渡し台から料理を取る" : "";
   return tickets.some((t) => t.status === "kitchen") ? "[E] 料理を受け渡し台に置く" : "";

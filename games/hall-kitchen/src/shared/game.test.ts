@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONFIG, DISHES, Game, spawnInterval } from "./game";
-import { PASS, SEATS, STOVES } from "./layout";
+import { CONFIG, Game, spawnInterval } from "./game";
+import { BARS, PASS, SEATS, STOVES } from "./layout";
+import { DISHES, DRINKS } from "./menu";
 
 function started(seed = 1): Game {
   const g = new Game(seed);
@@ -13,19 +14,41 @@ function started(seed = 1): Game {
 const run = (g: Game, sec: number, dt = 0.2) => {
   for (let t = 0; t < sec; t += dt) g.tick(dt);
 };
-const atSeat = (g: Game, role: "hall", i: number) => g.act(role, SEATS[i]!.x, SEATS[i]!.z);
+const atSeat = (g: Game, i: number) => g.act("hall", SEATS[i]!.x, SEATS[i]!.z);
+const atBar = (g: Game, i: number) => g.act("hall", BARS[i]!.x, BARS[i]!.z);
 const atStove = (g: Game, i: number) => g.act("kitchen", STOVES[i]!.x, STOVES[i]!.z);
 const hallPass = (g: Game) => g.act("hall", PASS.hall.x, PASS.hall.z);
 const kitchenPass = (g: Game) => g.act("kitchen", PASS.kitchen.x, PASS.kitchen.z);
+const tickets = (g: Game, kind: "food" | "drink") => g.snapshot().tickets.filter((t) => t.kind === kind);
+
+/** 座って待っている人全員の注文を取る。取った席の数を返す */
+function orderAll(g: Game): number {
+  let n = 0;
+  g.snapshot().seats.forEach((s, i) => {
+    if (s?.s === "waitOrder") {
+      atSeat(g, i);
+      n++;
+    }
+  });
+  return n;
+}
 
 /** 最初のお客さんが座って注文を取られるところまで進める */
 function firstOrder(g: Game): number {
   run(g, 2);
   const seat = g.snapshot().seats.findIndex((s) => s?.s === "waitOrder");
   assert.ok(seat >= 0, "お客さんが座っている");
-  atSeat(g, "hall", seat);
+  atSeat(g, seat);
   return seat;
 }
+
+test("メニューは料理20種・ドリンク20種", () => {
+  assert.equal(DISHES.length, 20);
+  assert.equal(DRINKS.length, 20);
+  assert.equal(new Set(DISHES.map((d) => d.name)).size, 20);
+  assert.equal(new Set(DRINKS.map((d) => d.name)).size, 20);
+  assert.ok(DRINKS.every((d) => d.make > 0 && d.relief > 0 && d.relief <= 1));
+});
 
 test("2人そろうとカウントダウンが始まり、抜けると最初に戻る", () => {
   const g = new Game();
@@ -46,84 +69,117 @@ test("来店の間隔はだんだん短くなる", () => {
 test("お客さんが来て、空き席に座る", () => {
   const g = started();
   run(g, 2);
-  const snap = g.snapshot();
-  assert.equal(snap.seats.filter((s) => s?.s === "waitOrder").length, 1);
+  assert.equal(g.snapshot().seats.filter((s) => s?.s === "waitOrder").length, 1);
 });
 
-test("注文を取ると、調理待ちの注文ができる", () => {
+test("注文を取ると、料理とドリンクの注文が1つずつできる", () => {
   const g = started();
   const seat = firstOrder(g);
-  const t = g.snapshot().tickets;
-  assert.equal(t.length, 1);
-  assert.equal(t[0]!.seat, seat);
-  assert.equal(t[0]!.status, "new");
-  assert.equal(g.snapshot().seats[seat]!.s, "waitFood");
+  assert.equal(tickets(g, "food").length, 1);
+  assert.equal(tickets(g, "drink").length, 1);
+  assert.ok(g.snapshot().tickets.every((t) => t.seat === seat && t.status === "new"));
+  assert.deepEqual(
+    [g.snapshot().seats[seat]!.s, g.snapshot().seats[seat]!.d],
+    ["waitFood", 1],
+  );
 });
 
-test("注文 → 調理 → 運ぶ → 出す → 食べて帰る、で1人さばける", () => {
+test("料理: 調理 → 運ぶ → 出す → 食べて帰る、で1人さばける", () => {
   const g = started();
   const seat = firstOrder(g);
-  const dish = g.snapshot().tickets[0]!.dish;
+  const item = tickets(g, "food")[0]!.item;
   assert.match(atStove(g, 0), /調理開始/);
   assert.equal(atStove(g, 0), "調理中です");
-  run(g, DISHES[dish].cook + 0.5);
-  assert.equal(g.snapshot().tickets[0]!.status, "ready");
+  run(g, DISHES[item]!.cook + 0.5);
+  assert.equal(tickets(g, "food")[0]!.status, "ready");
   assert.match(atStove(g, 0), /取った/);
   assert.match(kitchenPass(g), /台に置いた/);
   assert.match(hallPass(g), /取った/);
-  assert.match(atSeat(g, "hall", seat), /出した/);
-  assert.equal(g.snapshot().tickets.length, 0);
+  assert.match(atSeat(g, seat), /出した/);
+  assert.equal(tickets(g, "food").length, 0);
   run(g, CONFIG.eatTime + 0.5);
   assert.equal(g.served, 1);
   assert.equal(g.snapshot().seats[seat], null);
+  assert.equal(tickets(g, "drink").length, 0, "帰ったら、出さなかったドリンクの注文も消える");
 });
 
-test("違う席には料理を出せない", () => {
+test("ドリンク: 作って出すと、我慢ゲージが戻る", () => {
   const g = started();
-  firstOrder(g);
-  run(g, 8);
-  const other = g.snapshot().seats.findIndex((s) => s?.s === "waitOrder");
-  assert.ok(other >= 0);
-  atSeat(g, "hall", other);
+  const seat = firstOrder(g);
+  run(g, 25);
+  const before = g.snapshot().seats[seat]!.p;
+  const drink = tickets(g, "drink")[0]!;
+  assert.match(atBar(g, 0), /作り始めた/);
+  assert.equal(atBar(g, 0), "作っています");
+  run(g, DRINKS[drink.item]!.make + 0.5);
+  assert.match(atBar(g, 0), /取った/);
+  assert.match(atSeat(g, seat), /ゲージが戻った/);
+  const after = g.snapshot().seats[seat]!;
+  assert.ok(after.p > before, `${before} -> ${after.p}`);
+  assert.equal(after.d, 2);
+  assert.equal(tickets(g, "drink").length, 0);
+});
+
+test("ドリンクで戻っても、ゲージは満タンを超えない", () => {
+  const g = started();
+  const seat = firstOrder(g);
+  // 注文した直後(満タン)に出しても 1 を超えない
+  atBar(g, 0);
+  run(g, 3.2);
+  atBar(g, 0);
+  atSeat(g, seat);
+  assert.ok(g.snapshot().seats[seat]!.p <= 1);
+});
+
+test("料理とドリンクを一緒に持っていけば、1回で両方出せる", () => {
+  const g = started();
+  const seat = firstOrder(g);
   atStove(g, 0);
-  run(g, 8);
+  atBar(g, 0);
+  run(g, 12);
   atStove(g, 0);
   kitchenPass(g);
+  atBar(g, 0);
   hallPass(g);
-  const mine = g.snapshot().tickets.find((t) => t.status === "hall")!;
-  const wrong = g.snapshot().tickets.find((t) => t.seat !== mine.seat)!;
-  assert.equal(atSeat(g, "hall", wrong.seat), "その料理を持っていません");
+  const msg = atSeat(g, seat);
+  assert.match(msg, /ゲージが戻った/);
+  assert.equal(g.snapshot().seats[seat]!.s, "eating");
 });
 
-test("運べる数には上限がある", () => {
+test("持っていない席では何も出せない", () => {
   const g = started();
-  g.act("kitchen", STOVES[0]!.x, STOVES[0]!.z);
-  // 注文を3つ作ってコンロ2台で焼き、キッチンが持てるのは2つまで
-  run(g, 14);
-  for (let i = 0; i < 4; i++) {
-    const seat = g.snapshot().seats.findIndex((s) => s?.s === "waitOrder");
-    if (seat >= 0) atSeat(g, "hall", seat);
-    run(g, 0.4);
-  }
-  atStove(g, 0);
-  atStove(g, 1);
-  run(g, 8);
-  atStove(g, 0);
-  atStove(g, 1);
-  const held = g.snapshot().tickets.filter((t) => t.status === "kitchen").length;
-  assert.ok(held <= CONFIG.holdKitchen);
+  const seat = firstOrder(g);
+  assert.equal(atSeat(g, seat), "その席の料理もドリンクも持っていません");
 });
 
-test("待たせすぎると怒って帰り、注文も消える", () => {
+test("キッチンが持てる数には上限がある", () => {
+  const g = started();
+  for (let i = 0; i < 4; i++) {
+    run(g, 6);
+    orderAll(g);
+  }
+  assert.ok(tickets(g, "food").length >= 3, "注文が3つ以上");
+  atStove(g, 0);
+  atStove(g, 1);
+  run(g, 11);
+  atStove(g, 0);
+  atStove(g, 1);
+  assert.equal(g.snapshot().tickets.filter((t) => t.status === "kitchen").length, CONFIG.holdKitchen);
+  atStove(g, 0); // 3つ目を調理
+  run(g, 11);
+  assert.equal(atStove(g, 0), "手がいっぱいです");
+});
+
+test("待たせすぎると怒って帰り、料理もドリンクの注文も消える", () => {
   const g = started();
   firstOrder(g);
-  assert.equal(g.snapshot().tickets.length, 1);
+  assert.equal(g.snapshot().tickets.length, 2);
   run(g, CONFIG.foodPatience + 1);
   assert.ok(g.angry >= 1);
   assert.equal(g.snapshot().tickets.length, 0);
 });
 
-test("怒って帰った人が上限に達するとゲームオーバー", () => {
+test("時間いっぱいか、怒って帰った人が上限に達するとゲームオーバー", () => {
   const g = started();
   run(g, CONFIG.duration);
   assert.equal(g.phase, "over");
@@ -149,19 +205,19 @@ test("もう一度遊べる", () => {
   assert.equal(g.angry, 0);
 });
 
-test("調理する注文を切り替えられる", () => {
+test("作る注文を切り替えられる(キッチンは料理、ホールはドリンク)", () => {
   const g = started();
-  run(g, 4);
   for (let i = 0; i < 3; i++) {
-    const seat = g.snapshot().seats.findIndex((s) => s?.s === "waitOrder");
-    if (seat >= 0) atSeat(g, "hall", seat);
     run(g, 6);
+    orderAll(g);
   }
-  const ids = g.snapshot().tickets.filter((t) => t.status === "new").map((t) => t.id);
-  assert.ok(ids.length >= 2, `注文が2つ以上: ${ids.length}`);
-  const first = g.snapshot().selected;
-  g.cycle();
-  assert.notEqual(g.snapshot().selected, first);
+  assert.ok(tickets(g, "food").length >= 2);
+  const food = g.snapshot().selFood;
+  g.cycle("kitchen");
+  assert.notEqual(g.snapshot().selFood, food);
+  const drink = g.snapshot().selDrink;
+  g.cycle("hall");
+  assert.notEqual(g.snapshot().selDrink, drink);
 });
 
 test("ゲーム中でないときの操作は無視される", () => {
@@ -173,4 +229,5 @@ test("遠いところでは何も起きない", () => {
   const g = started();
   firstOrder(g);
   assert.equal(g.act("kitchen", 0, -5), "");
+  assert.equal(g.act("hall", 0, 8), "");
 });

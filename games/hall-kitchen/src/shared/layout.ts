@@ -21,6 +21,12 @@ export const STOVES: Spot[] = [
   { x: -3, z: -8.8 },
 ];
 
+// ドリンクバー(ホール側の右の壁)。2台で、ホールが飲み物を作る。
+export const BARS: Spot[] = [
+  { x: 8.8, z: 1.6 },
+  { x: 8.8, z: 3.6 },
+];
+
 // カウンターの受け渡し窓。ホール側とキッチン側で立つ位置が違う。
 export const PASS: Record<Role, Spot> = {
   hall: { x: 0, z: 0.3 },
@@ -29,15 +35,16 @@ export const PASS: Record<Role, Spot> = {
 /** 受け渡し台に置いた料理を並べる位置(表示用) */
 export const PASS_SLOT = (i: number): Spot & { y: number } => ({ x: -1.15 + i * 0.33, z: -0.5, y: 1.1 });
 
-export const RADIUS = { seat: 1.6, stove: 2.0, pass: 1.8 };
+export const RADIUS = { seat: 1.6, stove: 2.0, pass: 1.8, bar: 1.6 };
 
-export type Target = { kind: "seat" | "stove" | "pass"; i: number };
+export type Target = { kind: "seat" | "stove" | "bar" | "pass"; i: number };
 
 /** 役割ごとに、いまの位置から触れる一番近いものを返す */
 export function nearestTarget(role: Role, x: number, z: number): Target | null {
   const cands: { t: Target; spot: Spot; r: number }[] = [];
   if (role === "hall") {
     SEATS.forEach((s, i) => cands.push({ t: { kind: "seat", i }, spot: s, r: RADIUS.seat }));
+    BARS.forEach((s, i) => cands.push({ t: { kind: "bar", i }, spot: s, r: RADIUS.bar }));
   } else {
     STOVES.forEach((s, i) => cands.push({ t: { kind: "stove", i }, spot: s, r: RADIUS.stove }));
   }

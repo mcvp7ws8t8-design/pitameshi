@@ -45,6 +45,10 @@ export function buildRestaurant(): THREE.Scene {
     scene.add(box(0.5, 0.45, 0.5, 0x3b6ea5, x, 0.225, z - 1.1));
   }
 
+  // ドリンクバー(ホールの右の壁沿い)
+  scene.add(box(1, 1, 3.6, 0x2c6e8f, 9.4, 0.5, 2.6));
+  scene.add(box(1, 0.1, 3.6, 0xdfe9ef, 9.4, 1.05, 2.6));
+
   // キッチンの設備(奥の壁沿い)
   scene.add(box(2, 0.9, 1, 0x444a50, -6, 0.45, -8.8)); // コンロ1
   scene.add(box(2, 0.9, 1, 0x444a50, -3, 0.45, -8.8)); // コンロ2

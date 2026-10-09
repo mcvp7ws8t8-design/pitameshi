@@ -3,13 +3,8 @@
 // 数字は CONFIG にまとめてある。遊んでみて調整する。
 
 import { nearestTarget } from "./layout";
+import { DISHES, DRINKS, dishName, drinkName } from "./menu";
 import type { Role } from "./room";
-
-export type Dish = "salad" | "burger";
-export const DISHES: Record<Dish, { name: string; cook: number }> = {
-  salad: { name: "サラダ", cook: 3 },
-  burger: { name: "ハンバーグ", cook: 7 },
-};
 
 export const CONFIG = {
   duration: 300, // 1回のゲームの長さ(秒)
@@ -20,13 +15,13 @@ export const CONFIG = {
   orderPatience: 30, // 座ってから注文を取ってもらうまで
   foodPatience: 70, // 注文してから料理が届くまで
   eatTime: 4,
-  holdHall: 3, // ホールが一度に運べる数
+  holdHall: 4, // ホールが一度に運べる数(料理とドリンクの合計)
   holdKitchen: 2,
   passMax: 8, // 受け渡し台に置ける数
   stoves: 2,
+  bars: 2, // ドリンクバーの台数
   spawnStart: 6, // 来店の間隔(秒)。ゲーム中に spawnEnd まで縮む
   spawnEnd: 1,
-  saladRatio: 0.6,
 };
 
 export const spawnInterval = (clock: number): number =>
@@ -34,8 +29,10 @@ export const spawnInterval = (clock: number): number =>
 
 export type Phase = "waiting" | "countdown" | "playing" | "over";
 export type CustomerState = "queue" | "waitOrder" | "waitFood" | "eating";
-// new: 調理待ち / cooking: コンロの上 / ready: 焼き上がり(コンロの上) /
-// kitchen: キッチンが持っている / pass: 受け渡し台 / hall: ホールが持っている
+// food(料理)もdrink(ドリンク)も同じ流れ。
+// new: 作る前 / cooking: コンロやドリンクバーの上で作っている / ready: できあがり(その場に置いてある) /
+// kitchen: キッチンが持っている(料理だけ) / pass: 受け渡し台(料理だけ) / hall: ホールが持っている
+export type Kind = "food" | "drink";
 export type TicketStatus = "new" | "cooking" | "ready" | "kitchen" | "pass" | "hall";
 
 interface Customer {
@@ -44,29 +41,32 @@ interface Customer {
   patience: number;
   max: number;
   seat: number;
-  dish: Dish;
+  dish: number;
+  drink: number;
+  drinkDone: boolean;
   eatLeft: number;
 }
 interface Ticket {
   id: number;
-  dish: Dish;
+  kind: Kind;
+  item: number; // DISHES / DRINKS の番号
   seat: number;
   customer: number;
   status: TicketStatus;
-  stove: number;
   left: number;
 }
 
 export interface TicketSnapshot {
   id: number;
-  dish: Dish;
+  kind: Kind;
+  item: number;
   seat: number;
   status: TicketStatus;
-  stove: number;
 }
 export interface SeatSnapshot {
   s: Exclude<CustomerState, "queue">;
   p: number; // 我慢の残り 0〜1
+  d: 0 | 1 | 2; // ドリンク 0: まだ注文されていない / 1: 待っている / 2: 出した
 }
 export interface GameSnapshot {
   phase: Phase;
@@ -78,8 +78,10 @@ export interface GameSnapshot {
   queue: number;
   seats: (SeatSnapshot | null)[];
   tickets: TicketSnapshot[];
-  selected: number | null;
+  selFood: number | null;
+  selDrink: number | null;
   stoves: (number | null)[];
+  bars: (number | null)[];
 }
 
 function mulberry32(seed: number): () => number {
@@ -102,7 +104,9 @@ export class Game {
   customers: Customer[] = [];
   tickets: Ticket[] = [];
   stoves: (number | null)[] = Array(CONFIG.stoves).fill(null);
-  selected: number | null = null;
+  bars: (number | null)[] = Array(CONFIG.bars).fill(null);
+  selFood: number | null = null;
+  selDrink: number | null = null;
   seatCount: number;
   private nextId = 1;
   private spawnLeft = 1;
@@ -124,7 +128,8 @@ export class Game {
     this.customers = [];
     this.tickets = [];
     this.stoves = Array(CONFIG.stoves).fill(null);
-    this.selected = null;
+    this.bars = Array(CONFIG.bars).fill(null);
+    this.selFood = this.selDrink = null;
     this.nextId = 1;
     this.spawnLeft = 1;
     this.rng = mulberry32(this.seed);
@@ -174,6 +179,7 @@ export class Game {
         if (c.eatLeft <= 0) {
           this.served++;
           this.customers = this.customers.filter((x) => x !== c);
+          this.dropTicketsOf(c);
         }
       } else {
         c.patience -= dt;
@@ -197,7 +203,9 @@ export class Game {
       patience: CONFIG.queuePatience,
       max: CONFIG.queuePatience,
       seat: -1,
-      dish: this.rng() < CONFIG.saladRatio ? "salad" : "burger",
+      dish: Math.floor(this.rng() * DISHES.length),
+      drink: Math.floor(this.rng() * DRINKS.length),
+      drinkDone: false,
       eatLeft: 0,
     });
   }
@@ -218,47 +226,64 @@ export class Game {
 
   private leaveAngry(c: Customer): void {
     this.customers = this.customers.filter((x) => x !== c);
-    const t = this.tickets.find((x) => x.customer === c.id);
-    if (t) this.dropTicket(t);
+    this.dropTicketsOf(c);
     this.angry++;
+  }
+
+  private dropTicketsOf(c: Customer): void {
+    for (const t of this.tickets.filter((x) => x.customer === c.id)) this.dropTicket(t);
   }
 
   private dropTicket(t: Ticket): void {
     this.tickets = this.tickets.filter((x) => x !== t);
     for (let i = 0; i < this.stoves.length; i++) if (this.stoves[i] === t.id) this.stoves[i] = null;
-    if (this.selected === t.id) this.selected = null;
+    for (let i = 0; i < this.bars.length; i++) if (this.bars[i] === t.id) this.bars[i] = null;
+    if (this.selFood === t.id) this.selFood = null;
+    if (this.selDrink === t.id) this.selDrink = null;
   }
 
-  private newTickets(): Ticket[] {
-    return this.tickets.filter((t) => t.status === "new").sort((a, b) => a.id - b.id);
+  private newTickets(kind: Kind): Ticket[] {
+    return this.tickets.filter((t) => t.kind === kind && t.status === "new").sort((a, b) => a.id - b.id);
   }
 
-  /** 調理に回す注文。選んでいなければ一番古いもの */
-  currentSelected(): number | null {
-    const list = this.newTickets();
-    if (this.selected !== null && list.some((t) => t.id === this.selected)) return this.selected;
+  /** いま作る対象の注文。選んでいなければ一番古いもの */
+  currentSelected(kind: Kind): number | null {
+    const list = this.newTickets(kind);
+    const sel = kind === "food" ? this.selFood : this.selDrink;
+    if (sel !== null && list.some((t) => t.id === sel)) return sel;
     return list[0]?.id ?? null;
   }
 
-  /** 調理に回す注文を次のものに切り替える */
-  cycle(): void {
-    const list = this.newTickets();
+  /** 作る対象を次の注文に切り替える。キッチンは料理、ホールはドリンク */
+  cycle(role: Role): void {
+    const kind: Kind = role === "kitchen" ? "food" : "drink";
+    const list = this.newTickets(kind);
     if (list.length === 0) return;
-    const cur = this.currentSelected();
+    const cur = this.currentSelected(kind);
     const idx = list.findIndex((t) => t.id === cur);
-    this.selected = list[(idx + 1) % list.length]!.id;
+    const next = list[(idx + 1) % list.length]!.id;
+    if (kind === "food") this.selFood = next;
+    else this.selDrink = next;
   }
 
-  private count(status: TicketStatus): number {
-    return this.tickets.filter((t) => t.status === status).length;
+  private count(status: TicketStatus, kind?: Kind): number {
+    return this.tickets.filter((t) => t.status === status && (!kind || t.kind === kind)).length;
   }
 
-  /** E キー。位置に応じて、注文を取る・料理を出す・調理する・運ぶ。結果の一言を返す */
+  private ticketIn(slots: (number | null)[], i: number): Ticket | undefined {
+    const id = slots[i];
+    return id === null || id === undefined ? undefined : this.tickets.find((x) => x.id === id);
+  }
+
+  /** E キー。位置に応じて、注文を取る・作る・運ぶ・出す。結果の一言を返す */
   act(role: Role, x: number, z: number): string {
     if (this.phase !== "playing") return "";
     const target = nearestTarget(role, x, z);
     if (!target) return "";
-    if (role === "hall") return target.kind === "seat" ? this.hallSeat(target.i) : this.hallPass();
+    if (role === "hall") {
+      if (target.kind === "seat") return this.hallSeat(target.i);
+      return target.kind === "bar" ? this.hallBar(target.i) : this.hallPass();
+    }
     return target.kind === "stove" ? this.kitchenStove(target.i) : this.kitchenPass();
   }
 
@@ -266,20 +291,53 @@ export class Game {
     const c = this.customers.find((x) => x.seat === seat);
     if (!c) return "";
     if (c.state === "waitOrder") {
-      this.tickets.push({ id: this.nextId++, dish: c.dish, seat, customer: c.id, status: "new", stove: -1, left: 0 });
+      for (const [kind, item] of [["food", c.dish], ["drink", c.drink]] as const) {
+        this.tickets.push({ id: this.nextId++, kind, item, seat, customer: c.id, status: "new", left: 0 });
+      }
       c.state = "waitFood";
       c.max = c.patience = CONFIG.foodPatience;
-      return `席${seat + 1}: ${DISHES[c.dish].name}の注文`;
+      return `席${seat + 1}: ${dishName(c.dish)}と${drinkName(c.drink)}`;
     }
-    if (c.state === "waitFood") {
-      const t = this.tickets.find((x) => x.customer === c.id && x.status === "hall");
-      if (!t) return "その料理を持っていません";
+    const held = this.tickets.filter((t) => t.customer === c.id && t.status === "hall");
+    if (held.length === 0) return c.state === "waitFood" ? "その席の料理もドリンクも持っていません" : "";
+    const said: string[] = [];
+    // ドリンクを先に出す。我慢ゲージが戻る
+    for (const t of held.filter((x) => x.kind === "drink")) {
+      this.dropTicket(t);
+      c.drinkDone = true;
+      if (c.state === "waitFood") {
+        c.patience = Math.min(c.max, c.patience + c.max * (DRINKS[t.item]?.relief ?? 0));
+        said.push(`${drinkName(t.item)}を出した(ゲージが戻った)`);
+      } else {
+        said.push(`${drinkName(t.item)}を出した`);
+      }
+    }
+    for (const t of held.filter((x) => x.kind === "food")) {
+      if (c.state !== "waitFood") continue;
       this.dropTicket(t);
       c.state = "eating";
       c.eatLeft = CONFIG.eatTime;
-      return `席${seat + 1}に${DISHES[t.dish].name}を出した`;
+      said.push(`${dishName(t.item)}を出した`);
     }
-    return "";
+    return said.join("、");
+  }
+
+  private hallBar(i: number): string {
+    const t = this.ticketIn(this.bars, i);
+    if (t) {
+      if (t.status === "cooking") return "作っています";
+      if (this.count("hall") >= CONFIG.holdHall) return "トレーがいっぱいです";
+      t.status = "hall";
+      this.bars[i] = null;
+      return `${drinkName(t.item)}を取った`;
+    }
+    const next = this.tickets.find((x) => x.id === this.currentSelected("drink"));
+    if (!next) return "ドリンクの注文がありません";
+    next.status = "cooking";
+    next.left = DRINKS[next.item]?.make ?? 1;
+    this.bars[i] = next.id;
+    this.selDrink = null;
+    return `席${next.seat + 1}の${drinkName(next.item)}を作り始めた`;
   }
 
   private hallPass(): string {
@@ -297,24 +355,21 @@ export class Game {
   }
 
   private kitchenStove(i: number): string {
-    const id = this.stoves[i];
-    const t = id === null || id === undefined ? undefined : this.tickets.find((x) => x.id === id);
+    const t = this.ticketIn(this.stoves, i);
     if (t) {
       if (t.status === "cooking") return "調理中です";
       if (this.count("kitchen") >= CONFIG.holdKitchen) return "手がいっぱいです";
       t.status = "kitchen";
       this.stoves[i] = null;
-      return `${DISHES[t.dish].name}を取った`;
+      return `${dishName(t.item)}を取った`;
     }
-    const sel = this.currentSelected();
-    const next = this.tickets.find((x) => x.id === sel);
+    const next = this.tickets.find((x) => x.id === this.currentSelected("food"));
     if (!next) return "調理する注文がありません";
     next.status = "cooking";
-    next.stove = i;
-    next.left = DISHES[next.dish].cook;
+    next.left = DISHES[next.item]?.cook ?? 1;
     this.stoves[i] = next.id;
-    this.selected = null;
-    return `席${next.seat + 1}の${DISHES[next.dish].name}を調理開始`;
+    this.selFood = null;
+    return `席${next.seat + 1}の${dishName(next.item)}を調理開始`;
   }
 
   private kitchenPass(): string {
@@ -335,7 +390,8 @@ export class Game {
     const seats: (SeatSnapshot | null)[] = Array(this.seatCount).fill(null);
     for (const c of this.customers) {
       if (c.state === "queue") continue;
-      seats[c.seat] = { s: c.state, p: c.state === "eating" ? 1 : Math.round((c.patience / c.max) * 100) / 100 };
+      const d = c.state === "waitOrder" ? 0 : c.drinkDone ? 2 : 1;
+      seats[c.seat] = { s: c.state, p: c.state === "eating" ? 1 : Math.round((c.patience / c.max) * 100) / 100, d };
     }
     return {
       phase: this.phase,
@@ -346,9 +402,11 @@ export class Game {
       maxAngry: CONFIG.maxAngry,
       queue: this.customers.filter((c) => c.state === "queue").length,
       seats,
-      tickets: this.tickets.map(({ id, dish, seat, status, stove }) => ({ id, dish, seat, status, stove })),
-      selected: this.currentSelected(),
+      tickets: this.tickets.map(({ id, kind, item, seat, status }) => ({ id, kind, item, seat, status })),
+      selFood: this.currentSelected("food"),
+      selDrink: this.currentSelected("drink"),
       stoves: [...this.stoves],
+      bars: [...this.bars],
     };
   }
 }

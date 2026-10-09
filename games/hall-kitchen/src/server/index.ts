@@ -87,7 +87,8 @@ export class Room extends DurableObject<Env> {
       if (text) this.send(ws, { t: "info", text });
       return this.broadcastGame();
     } else if (msg.t === "next") {
-      this.game.cycle();
+      const p = this.state.players.get(me.id);
+      if (p?.role) this.game.cycle(p.role);
       return this.broadcastGame();
     } else if (msg.t === "restart") {
       this.game.restart(this.bothReady());

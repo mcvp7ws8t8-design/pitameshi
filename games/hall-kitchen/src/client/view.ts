@@ -2,11 +2,15 @@
 // お客さん・行列・コンロの上の料理・受け渡し台の料理・席の番号。
 
 import * as THREE from "three";
-import { type Dish, type GameSnapshot } from "../shared/game";
-import { PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot } from "../shared/layout";
+import { type GameSnapshot } from "../shared/game";
+import { BARS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot } from "../shared/layout";
+import { DISHES, DRINKS } from "../shared/menu";
 import { buildAvatar } from "./scene";
 
-const DISH_COLOR: Record<Dish, number> = { salad: 0x6ab04c, burger: 0x8b5a2b };
+// 種類ごとに色を変える(絵は使わず、色相だけで見分ける)
+const hue = (item: number, count: number) => new THREE.Color().setHSL(item / count, 0.6, 0.5).getHex();
+const dishColor = (item: number) => hue(item, DISHES.length);
+const drinkColor = (item: number) => hue(item, DRINKS.length);
 const STATE_COLOR = { waitOrder: 0xf1c40f, waitFood: 0xe67e22, eating: 0x2ecc71 } as const;
 
 function setShirt(g: THREE.Group, color: number) {
@@ -44,6 +48,8 @@ export class GameView {
   private queue: THREE.Group[] = [];
   private stoveDish: THREE.Mesh[] = [];
   private passDish: THREE.Mesh[] = [];
+  private barDrink: THREE.Mesh[] = [];
+  private drinkMarks: THREE.Sprite[] = [];
 
   constructor(scene: THREE.Scene) {
     SEATS.forEach((s, i) => {
@@ -59,6 +65,13 @@ export class GameView {
       bar.visible = false;
       scene.add(bar);
       this.bars.push(bar);
+
+      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x3fc1ff }));
+      mark.position.set(s.x + 0.55, 2.2, s.z);
+      mark.scale.set(0.16, 0.22, 1);
+      mark.visible = false;
+      scene.add(mark);
+      this.drinkMarks.push(mark);
 
       const label = numberSprite(i + 1);
       label.position.set(s.x, 2.65, s.z);
@@ -78,6 +91,13 @@ export class GameView {
       d.position.set(s.x, 0.96, s.z);
       scene.add(d);
       this.stoveDish.push(d);
+    });
+    BARS.forEach((s) => {
+      const d = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.3, 0.18), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+      d.position.set(9.4 - 0.5, 1.25, s.z);
+      d.visible = false;
+      scene.add(d);
+      this.barDrink.push(d);
     });
     for (let i = 0; i < 8; i++) {
       const d = dishBox();
@@ -99,6 +119,7 @@ export class GameView {
       m.color.setHex(seat.p > 0.5 ? 0x2ecc71 : seat.p > 0.25 ? 0xf1c40f : 0xe74c3c);
       bar.scale.set(Math.max(0.02, seat.p) * 0.9, 0.1, 1);
       bar.visible = seat.s !== "eating";
+      this.drinkMarks[i]!.visible = seat.d === 1;
     });
     this.queue.forEach((q, i) => (q.visible = i < g.queue));
 
@@ -108,14 +129,22 @@ export class GameView {
       const t = id === null ? undefined : byId.get(id);
       d.visible = !!t;
       if (!t) return;
-      (d.material as THREE.MeshLambertMaterial).color.setHex(t.status === "cooking" ? 0xe74c3c : DISH_COLOR[t.dish]);
+      (d.material as THREE.MeshLambertMaterial).color.setHex(t.status === "cooking" ? 0xe74c3c : dishColor(t.item));
+      d.scale.y = t.status === "cooking" ? 0.5 : 1;
+    });
+    g.bars.forEach((id, i) => {
+      const d = this.barDrink[i]!;
+      const t = id === null ? undefined : byId.get(id);
+      d.visible = !!t;
+      if (!t) return;
+      (d.material as THREE.MeshLambertMaterial).color.setHex(t.status === "cooking" ? 0xbfe3f5 : drinkColor(t.item));
       d.scale.y = t.status === "cooking" ? 0.5 : 1;
     });
     const onPass = g.tickets.filter((t) => t.status === "pass").sort((a, b) => a.id - b.id);
     this.passDish.forEach((d, i) => {
       const t = onPass[i];
       d.visible = !!t;
-      if (t) (d.material as THREE.MeshLambertMaterial).color.setHex(DISH_COLOR[t.dish]);
+      if (t) (d.material as THREE.MeshLambertMaterial).color.setHex(dishColor(t.item));
     });
   }
 }
