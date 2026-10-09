@@ -139,7 +139,7 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
   });
 
   // ---- 奥の壁: ステンレスの立ち上がり、フード(油こしフィルター)、消火設備 ----
-  scene.add(box(14, 0.7, 0.03, steel(6, 1), -2, 1.45, -9.8));
+  scene.add(box(14, 0.7, 0.03, steel(6, 1), -2, 1.45, -9.74));
   const hoodX = -2.5;
   scene.add(box(13, 0.5, 1.3, steel(6, 1), hoodX, 2.35, -9.2, { round: 0.02 }), box(1.1, 0.9, 1.1, steel(1, 1), hoodX, 2.95, -9.2));
   for (let k = 0; k < 13; k++) {
@@ -198,27 +198,56 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
   // 皿とラック
   for (let k = 0; k < 8; k++) add(sink, cyl(0.12, 0.1, 0.018, plain(0xf6f6f2, 0.25, 0), 0.65, 0.92 + k * 0.02, 0.15, 20));
 
-  // ---- 右の壁: 作業台(まな板・包丁・保存容器)と棚 ----
+  // ---- 右の壁: 作業台(下は引き出し付きの冷蔵庫)・まな板・オーブン・ワイヤー棚 ----
+  const bright = plain(0xc9ced4, 0.28, 0.95);
   scene.add(box(1.0, 0.86, 4.8, steel(2, 3), 9.4, 0.43, -5, { round: 0.008 }), box(1.04, 0.05, 4.84, steel(3, 2), 9.4, 0.89, -5));
-  scene.add(box(0.9, 0.02, 4.6, plain(0x9aa0a7, 0.35, 0.9), 9.4, 0.3, -5, { recv: false })); // 下段の棚
+  // 台の下は、扉と引き出しのある冷蔵庫(手前の面は +x)
+  for (let k = 0; k < 4; k++) {
+    const z = -7.1 + k * 1.2;
+    scene.add(box(0.02, 0.7, 1.12, darkSteel, 8.895, 0.45, z, { cast: false }));
+    scene.add(box(0.03, 0.04, 0.5, bright, 8.89, 0.74, z)); // 取っ手
+    if (k % 2 === 1) scene.add(box(0.025, 0.02, 1.1, plain(0x1e2023, 0.6, 0.4), 8.893, 0.28, z, { cast: false })); // 引き出しの継ぎ目
+  }
+  scene.add(box(0.1, 0.1, 4.7, plain(0x1c1c1e, 0.8, 0.3), 8.93, 0.05, -5, { cast: false })); // 幅木
+  // 上に置くもの: オーブン、まな板、包丁、保存容器
+  const oven = box(0.8, 0.85, 0.75, steel(1, 1), 9.3, 1.34, -2.95, { round: 0.015 });
+  scene.add(oven);
+  scene.add(box(0.02, 0.55, 0.55, new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.08, metalness: 0.6 }), 8.89, 1.3, -2.95, { cast: false })); // ガラス扉
+  scene.add(box(0.02, 0.16, 0.5, new THREE.MeshStandardMaterial({ color: 0x1a1f24, emissive: 0xff7a1a, emissiveIntensity: 1.2 }), 8.89, 1.66, -2.95, { cast: false })); // 表示部
+  scene.add(box(0.03, 0.03, 0.4, bright, 8.87, 1.55, -2.95));
   const boards = [0xf2f0ea, 0xe8c77a, 0x7fae6a, 0xd9867a];
   boards.forEach((c, k) => {
-    scene.add(box(0.42, 0.025, 0.6, plain(c, 0.7, 0), 9.3, 0.93, -3.2 - k * 0.8));
+    scene.add(box(0.42, 0.025, 0.6, plain(c, 0.7, 0), 9.3, 0.93, -4.0 - k * 0.8));
   });
-  scene.add(box(0.03, 0.018, 0.3, plain(0xc4c9cf, 0.2, 1), 9.28, 0.96, -3.3));
-  scene.add(box(0.025, 0.02, 0.13, plain(0x2a2a2c, 0.6, 0.1), 9.28, 0.96, -3.52));
+  scene.add(box(0.03, 0.018, 0.3, bright, 9.28, 0.96, -4.1));
+  scene.add(box(0.025, 0.02, 0.13, plain(0x2a2a2c, 0.6, 0.1), 9.28, 0.96, -4.32));
   const tubColors = [0xd9453b, 0x6aa83a, 0xe9a23a, 0xf0e6c8];
-  for (let k = 0; k < 6; k++) {
-    scene.add(box(0.3, 0.1, 0.22, plain(tubColors[k % 4]!, 0.5, 0), 9.62, 0.97, -3.0 - k * 0.55, { round: 0.01 }));
+  for (let k = 0; k < 5; k++) {
+    scene.add(box(0.3, 0.1, 0.22, plain(tubColors[k % 4]!, 0.5, 0), 9.62, 0.97, -3.9 - k * 0.55, { round: 0.01 }));
   }
-  // 壁の棚: 保存容器と鍋
-  scene.add(box(0.4, 0.04, 4.8, h.wood(2, 1), 9.7, 1.75, -5), box(0.4, 0.04, 4.8, h.wood(2, 1), 9.7, 2.3, -5));
-  for (let k = 0; k < 7; k++) {
-    const z = -7.2 + k * 0.66;
-    const potM = plain([0xb8bdc4, 0x8a8f96, 0xc9a24a, 0x6a6e75][k % 4]!, 0.3, 0.9);
-    scene.add(cyl(0.14, 0.12, 0.16, potM, 9.7, 1.85, z, 18), cyl(0.12, 0.1, 0.14, potM, 9.7, 2.4, z, 18));
-    scene.add(box(0.28, 0.14, 0.24, plain([0xe9a23a, 0xe9e3d2, 0xb8d9a0][k % 3]!, 0.5, 0), 9.7, 2.0 + 0.0, z - 0.3, { round: 0.01 }));
+  // ワイヤー棚(ステンレスの支柱と3段の棚)に、鍋・フライパン・保存容器・トレーを積む
+  const post = (z: number, x: number) => scene.add(cyl(0.018, 0.018, 1.7, bright, x, 1.76, z, 8));
+  for (const z of [-7.4, -4.9, -2.4]) for (const x of [9.5, 9.93]) post(z, x);
+  const tiers = [1.45, 1.9, 2.35];
+  for (const y of tiers) {
+    scene.add(box(0.46, 0.02, 5.0, bright, 9.72, y, -4.9, { cast: false }));
+    scene.add(box(0.02, 0.05, 5.0, bright, 9.5, y + 0.03, -4.9, { cast: false }));
   }
+  const potColors = [0xc9ced4, 0x9aa0a7, 0xc9a24a, 0x6a6e75];
+  for (let k = 0; k < 8; k++) {
+    const z = -7.2 + k * 0.62;
+    const potM = plain(potColors[k % 4]!, 0.3, 0.95);
+    // 下段: 鍋(蓋つき)
+    scene.add(cyl(0.15, 0.13, 0.18, potM, 9.72, 1.55, z, 18), cyl(0.155, 0.155, 0.015, potM, 9.72, 1.65, z, 18));
+    // 中段: 重ねたフライパンとトレー
+    for (let j = 0; j < 3; j++) scene.add(cyl(0.15 - j * 0.005, 0.12, 0.03, plain(0x2a2d31, 0.45, 0.85), 9.72, 2.0 + j * 0.04, z, 18));
+    // 上段: 保存容器(蓋つき)
+    scene.add(box(0.3, 0.14, 0.26, plain([0xf0e6c8, 0xb8d9a0, 0xe9a23a][k % 3]!, 0.5, 0), 9.72, 2.44, z, { round: 0.012 }));
+    scene.add(box(0.31, 0.015, 0.27, plain(0xe8eef2, 0.4, 0), 9.72, 2.52, z, { cast: false }));
+  }
+  scene.add(box(0.4, 0.04, 4.6, bright, 9.7, 2.8, -5, { cast: false }));
+  // 手洗い用の石けんとペーパータオル
+  scene.add(box(0.08, 0.2, 0.06, plain(0xe8eef2, 0.4, 0), 9.85, 1.2, -9.55), box(0.2, 0.28, 0.1, plain(0xc9ced4, 0.3, 0.9), 9.85, 1.5, -9.0));
 
   // ---- 左の壁: 調理器具を吊るすレール ----
   scene.add(rotated(cyl(0.012, 0.012, 5.0, darkSteel, -9.75, 1.95, -5, 8), Math.PI / 2, 0, 0));
@@ -259,6 +288,38 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
   clock.position.set(-5, 2.7, -1.03);
   scene.add(clock, box(0.012, 0.14, 0.01, plain(0x111111, 0.5, 0), -5, 2.74, -1.06), box(0.1, 0.012, 0.01, plain(0x111111, 0.5, 0), -4.95, 2.7, -1.06));
   for (let k = 0; k < 6; k++) scene.add(cyl(0.12, 0.1, 0.018, plain(0xf6f6f2, 0.25, 0), -1.9, 1.06 + k * 0.02, -0.7, 20));
+
+  // ---- 壁のステンレス張り、天井の設備(LED照明・ダクト・配管)、排水溝 ----
+  const wallSteel = steel(8, 2);
+  for (const [x, z, w, d] of [[-9.745, -5, 0.03, 10], [9.745, -5, 0.03, 10]] as const) {
+    scene.add(box(w, 1.1, d, wallSteel, x, 1.35, z, { cast: false }));
+  }
+  // 仕切りの厨房側もステンレス張り
+  scene.add(box(20, 1.0, 0.03, wallSteel, 0, 0.5, -1.015, { cast: false }));
+  // 板の継ぎ目
+  for (let k = 0; k < 10; k++) {
+    for (const x of [-9.725, 9.725]) scene.add(box(0.012, 1.1, 0.012, plain(0x2a2d31, 0.7, 0.4), x, 1.35, -9.5 + k, { cast: false }));
+    scene.add(box(0.012, 0.7, 0.012, plain(0x2a2d31, 0.7, 0.4), -9 + k * 2, 1.45, -9.725, { cast: false }));
+  }
+  const led = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf0f8ff, emissiveIntensity: 2.6 });
+  for (const [x, z] of [[-7, -3], [-2, -3], [3, -3], [7, -3], [-7, -6.5], [-2, -6.5], [3, -6.5], [7, -6.5]] as const) {
+    scene.add(box(1.6, 0.03, 0.22, led, x, 3.17, z, { cast: false }));
+  }
+  // ダクトと配管(フードから天井、横へ)
+  const duct = steel(4, 1);
+  scene.add(box(0.9, 0.55, 8.5, duct, 4.2, 2.95, -5.2, { cast: false }), box(7.5, 0.55, 0.9, duct, -0.2, 2.95, -9.5, { cast: false }));
+  scene.add(rotated(cyl(0.05, 0.05, 6, plain(0xb7bcc2, 0.35, 0.9), -3, 3.05, -2.4, 10), 0, 0, Math.PI / 2));
+  scene.add(rotated(cyl(0.03, 0.03, 5, plain(0xb3261e, 0.45, 0.5), -3, 3.0, -2.6, 8), 0, 0, Math.PI / 2));
+  // 床の排水溝(ステンレスの格子ぶた)
+  scene.add(box(15, 0.012, 0.18, plain(0x8f949b, 0.35, 0.95), 0, 0.007, -5.4, { cast: false }));
+  for (let k = -36; k <= 36; k++) scene.add(box(0.015, 0.014, 0.16, plain(0x2a2d31, 0.7, 0.5), k * 0.2, 0.008, -5.4, { cast: false }));
+  // 移動式のトレー棚(天板の保存容器やトレーを載せる)
+  const rollRack = unit(-9.1, -1.55, 0);
+  for (const dx of [-0.25, 0.25]) for (const dz of [-0.2, 0.2]) add(rollRack, cyl(0.015, 0.015, 1.6, bright, dx, 0.8, dz, 8));
+  for (let k = 0; k < 6; k++) {
+    add(rollRack, box(0.56, 0.015, 0.46, bright, 0, 0.25 + k * 0.25, 0, { cast: false }));
+    add(rollRack, box(0.5, 0.03, 0.4, plain(k % 2 ? 0x2a2d31 : 0xb8bdc4, 0.4, 0.85), 0, 0.28 + k * 0.25, 0, { cast: false }));
+  }
 
   // ---- 受け渡し窓の上: 注文伝票のレール ----
   scene.add(box(2.9, 0.025, 0.03, darkSteel, 0, 2.62, -1.04));

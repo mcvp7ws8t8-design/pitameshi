@@ -250,7 +250,7 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   // キッチンの天井灯
   for (const [x, z] of [[-5, -3.5], [3, -3.5], [-1, -7.5]] as const) {
     scene.add(box(1.2, 0.04, 0.5, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xe8f2ff, emissiveIntensity: 2.2 }), x, H - 0.02, z, { cast: false }));
-    const l = new THREE.PointLight(0xeaf4ff, 16, 9, 2);
+    const l = new THREE.PointLight(0xeaf4ff, 22, 11, 2);
     l.position.set(x, H - 0.3, z);
     scene.add(l);
   }
