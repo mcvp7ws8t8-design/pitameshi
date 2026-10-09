@@ -7,6 +7,7 @@ import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
 import { animateWalk, buildPerson, lookFor, type Person } from "./people";
 import { preloadFood } from "./food";
+import { Sound } from "./audio";
 import { loadHdri } from "./hdri";
 import { loadModel, placeable } from "./models";
 import { buildRestaurant } from "./scene";
@@ -48,6 +49,9 @@ document.body.prepend(renderer.domElement);
 
 const { scene, kitchen, tableVases } = buildRestaurant(renderer);
 const view = new GameView(scene, kitchen);
+const sound = new Sound();
+// ブラウザは、画面を操作するまで音を出せない。最初のクリックかキー入力で始める
+for (const ev of ["pointerdown", "keydown"]) addEventListener(ev, () => sound.start());
 const hands = new ViewModel(scene.environment as THREE.Texture | null);
 // 反射の背景。金属(ステンレスなど)にだけ、実際の室内の景色を映す。
 // 壁や天井まで照らしてしまうと、背景画像の色が部屋全体に移ってしまうので、金属の反射だけに使う
@@ -94,6 +98,7 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  view.effects.setViewport(innerHeight * renderer.getPixelRatio(), camera.fov);
 }
 addEventListener("resize", resize);
 resize();
@@ -104,6 +109,7 @@ let myRole: Role | null = null;
 let game: GameSnapshot | null = null;
 let infoTimer = 0;
 let speed = 0;
+let stepDist = 0;
 const me = { x: 0, z: 0, yaw: 0, pitch: 0 };
 
 interface Avatar {
@@ -148,7 +154,10 @@ function connect(code: string, create: boolean) {
     message(msg) {
       if (msg.t === "welcome") myId = msg.id;
       else if (msg.t === "game") onGame(msg.g);
-      else if (msg.t === "info") toast(msg.text);
+      else if (msg.t === "info") {
+        toast(msg.text);
+        sound.action();
+      }
       else if (msg.t === "error") {
         say({ full: "この部屋は満員です", "role-taken": "その役割は選ばれています", "bad-message": "通信エラー" }[msg.reason]);
       } else onState(msg.players);
@@ -169,6 +178,7 @@ function onState(list: PlayerSnapshot[]) {
   const mine = list.find((p) => p.id === myId);
   if (mine?.role && myRole !== mine.role) {
     myRole = mine.role;
+    sound.setRole(myRole);
     hands.setRole(myRole);
     Object.assign(me, { x: mine.x, z: mine.z, yaw: mine.yaw, pitch: 0 });
     $("ui").classList.add("hidden");
@@ -207,10 +217,16 @@ function onState(list: PlayerSnapshot[]) {
     }
   }
   const other = list.find((p) => p.id !== myId);
-  if (myRole) {
-    const state = other ? (other.role ? `${ROLE_NAME[other.role]}で参加中` : "役割を選んでいます") : "相手を待っています";
-    $("hud").innerHTML = `<span class="chip role">${ROLE_NAME[myRole]}</span><span class="chip ${other?.role ? "ok" : "wait"}">${state}</span>`;
-  }
+  partner = other ? (other.role ? `${ROLE_NAME[other.role]}で参加中` : "役割を選んでいます") : "相手を待っています";
+  partnerReady = !!other?.role;
+  renderHud();
+}
+
+let partner = "";
+let partnerReady = false;
+function renderHud() {
+  if (!myRole) return;
+  $("hud").innerHTML = `<span class="chip role">${ROLE_NAME[myRole]}</span><span class="chip ${partnerReady ? "ok" : "wait"}">${partner}</span><span class="chip">音 ${sound.on ? "オン" : "オフ"} <kbd>M</kbd></span>`;
 }
 
 // ---- ゲームの表示 ----
@@ -228,8 +244,10 @@ const STATE_LABEL: Record<PartState, string> = { need: "未", raw: "持", cookin
 const methodTag = (ing: number) => `<i class="m ${methodOfIngredient(ing)}">${METHOD_NAME[methodOfIngredient(ing)]}</i>`;
 
 function onGame(g: GameSnapshot) {
-  const prevPhase = game?.phase;
+  const prev = game;
+  const prevPhase = prev?.phase;
   game = g;
+  soundEvents(prev, g);
   view.update(g);
   if (g.phase === "over" && prevPhase !== "over") document.exitPointerLock();
   const time = `${Math.floor(g.timeLeft / 60)}:${String(g.timeLeft % 60).padStart(2, "0")}`;
@@ -245,6 +263,28 @@ function onGame(g: GameSnapshot) {
     .filter((t) => t.status === "hall")
     .sort((a, b) => a.id - b.id)
     .map((t): Held => ({ kind: t.kind, item: t.item })));
+}
+
+/** 状態の変わり目に、音を鳴らす。調理中の数や座っている人の数で、環境音の大きさも決める */
+function soundEvents(prev: GameSnapshot | null, g: GameSnapshot) {
+  if (prev) {
+    if (g.served > prev.served) sound.served();
+    if (g.angry > prev.angry) sound.angry();
+    if (prev.phase === "countdown" && g.phase === "countdown" && g.countdown !== prev.countdown && g.countdown > 0) sound.beep();
+    if (prev.phase === "countdown" && g.phase === "playing") sound.go();
+    if (g.phase === "over" && prev.phase !== "over") sound.over();
+    if (myRole === "kitchen") {
+      const known = new Set(prev.tickets.map((t) => t.id));
+      if (g.tickets.some((t) => t.kind === "food" && !known.has(t.id))) sound.order();
+    }
+  }
+  const cooking = { grill: 0, boil: 0, fry: 0 };
+  g.stoves.forEach((id, i) => {
+    if (id === null) return;
+    const part = g.tickets.find((t) => t.id === partTicket(id))?.parts?.[partIndex(id)];
+    if (part?.st === "cooking") cooking[STOVES[i]!.kind]++;
+  });
+  sound.setScene({ ...cooking, seated: g.seats.filter((s) => s !== null).length });
 }
 
 function slip(t: TicketSnapshot, selected: boolean): string {
@@ -368,10 +408,18 @@ addEventListener("keydown", (e) => {
   keys.add(e.code);
   if (e.repeat) return;
   if (e.code === "KeyE") {
-    if (myRole === "kitchen" && nearestTarget("kitchen", me.x, me.z)?.kind === "fridge") kitchen.openFridge();
+    if (myRole === "kitchen" && nearestTarget("kitchen", me.x, me.z)?.kind === "fridge") {
+      kitchen.openFridge();
+      view.effects.fridgeFog();
+      sound.fridge();
+    }
     send({ t: "act" });
   }
   else if (e.code === "KeyR") send({ t: "next" });
+  else if (e.code === "KeyM") {
+    sound.toggle();
+    renderHud();
+  }
   else if (e.code === "Enter" && game?.phase === "over") send({ t: "restart" });
 });
 addEventListener("keyup", (e) => keys.delete(e.code));
@@ -421,7 +469,13 @@ renderer.setAnimationLoop((now) => {
     me.pitch = Math.max(-1.3, Math.min(1.3, me.pitch + (key("ArrowUp") - key("ArrowDown")) * dt * 1.5));
     const before = { x: me.x, z: me.z };
     Object.assign(me, step(me, myRole, mx, mz, me.yaw, dt));
-    speed = Math.hypot(me.x - before.x, me.z - before.z) / Math.max(dt, 1e-3);
+    const moved = Math.hypot(me.x - before.x, me.z - before.z);
+    speed = moved / Math.max(dt, 1e-3);
+    stepDist += moved;
+    if (stepDist > 0.85) {
+      stepDist = 0;
+      sound.step(myRole === "kitchen" ? "tile" : "wood");
+    }
     showPrompt();
   }
   for (const a of avatars.values()) {
@@ -436,6 +490,7 @@ renderer.setAnimationLoop((now) => {
   camera.rotation.set(me.pitch, me.yaw, 0);
   camera.updateMatrixWorld();
   kitchen.update(dt);
+  view.tick(dt, now / 1000);
   hands.update(camera, now / 1000, speed);
   renderer.clear();
   renderer.render(scene, camera);

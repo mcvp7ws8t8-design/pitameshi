@@ -126,6 +126,34 @@ const ING_MODEL: Record<number, ModelSpec> = {
   37: ["leek", "leek", 0.15, [0x6aa83a, 0.5], [0x5a9a30, 0.5]], // アスパラ
 };
 
+/**
+ * ドリンクごとの3Dモデル。[モデル, 大きさ(m), 色寄せ]。順番は src/shared/menu.ts の DRINKS と同じ。
+ * 色寄せは、中身の色(お茶・ジュース・お酒など)を出すのに使う。
+ */
+type DrinkSpec = [model: FoodModel, size: number, tint?: Tint];
+const DRINK_MODEL: DrinkSpec[] = [
+  ["glass", 0.13], // お冷
+  ["cup-tea", 0.1, [0x8a5a2b, 0.35]], // 烏龍茶
+  ["cup-thea", 0.1, [0x8aa84a, 0.35]], // 緑茶
+  ["soda-bottle", 0.18], // コーラ
+  ["soda", 0.15, [0xd9a441, 0.45]], // ジンジャーエール
+  ["soda-glass", 0.14, [0xf08a1a, 0.5]], // オレンジジュース
+  ["soda-glass", 0.14, [0xe6c75a, 0.5]], // アップルジュース
+  ["soda", 0.15, [0x5a3a22, 0.55]], // アイスコーヒー
+  ["cup", 0.1], // ホットコーヒー
+  ["soda", 0.15, [0xb86a24, 0.5]], // アイスティー
+  ["cup-tea", 0.1], // ホットティー
+  ["soda-glass", 0.14, [0xe8e060, 0.5]], // レモンスカッシュ
+  ["bottle", 0.18, [0xe9b43a, 0.6]], // 生ビール
+  ["glass", 0.13, [0xe8c860, 0.55]], // ハイボール
+  ["glass", 0.13, [0xc89a30, 0.6]], // 梅酒
+  ["cup", 0.1, [0xc8a078, 0.45]], // カフェラテ
+  ["mug-1", 0.11], // ココア
+  ["frappe", 0.15, [0xf0f0a0, 0.4]], // レモンサワー
+  ["glass-wine", 0.17, [0x8a1a2e, 0.55]], // ワイン
+  ["egg-cup", 0.07], // 日本酒
+];
+
 const geoCache = new Map<string, THREE.BufferGeometry>();
 function geo(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
   let g = geoCache.get(key);
@@ -335,7 +363,7 @@ export function makeDish(i: number): THREE.Group {
   return g;
 }
 
-export function makeDrink(i: number): THREE.Group {
+function proceduralDrink(i: number): THREE.Group {
   const look = DRINK_LOOK[i % DRINK_LOOK.length]!;
   const g = new THREE.Group();
   const liquid = std(look.color, 0.2);
@@ -380,6 +408,16 @@ export function makeDrink(i: number): THREE.Group {
       break;
   }
   return g;
+}
+
+/** ドリンク1つ。モデルがあるものはそれ、読み込めていなければコードで作った形。原点は底の中心 */
+export function makeDrink(i: number): THREE.Group {
+  const spec = DRINK_MODEL[i % DRINK_MODEL.length];
+  if (spec) {
+    const m = foodModel(spec[0], spec[1], spec[2]);
+    if (m) return m;
+  }
+  return proceduralDrink(i);
 }
 
 /** 注文票などに使う代表色(#rrggbb) */

@@ -8,6 +8,7 @@ import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink, makeIngredient } from "./items";
 import { dishColorHex } from "./items";
 import type { Kitchen } from "./kitchen";
+import { Effects } from "./effects";
 import { applyLook, bakePerson, buildPerson, lookFor, type Person } from "./people";
 
 function bubbleTexture(draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -139,6 +140,8 @@ class Slot {
 }
 
 export class GameView {
+  readonly effects: Effects;
+  private seatState: string[] = [];
   private seatPeople: Person[] = [];
   private seatLook: number[] = [];
   private bars: THREE.Sprite[] = [];
@@ -152,6 +155,7 @@ export class GameView {
   private passSlot: Slot[] = [];
 
   constructor(scene: THREE.Scene, private kitchen: Kitchen) {
+    this.effects = new Effects(scene);
     SEATS.forEach((s, i) => {
       const back = s.yaw === 0 ? 1 : -1; // 背もたれ側
       const person = buildPerson(lookFor(0), "customer", true);
@@ -223,6 +227,30 @@ export class GameView {
     }
   }
 
+  /** 毎フレーム呼ぶ。お客さんの動き(食べる・手を挙げる)と、湯気や煙 */
+  tick(dt: number, time: number): void {
+    this.effects.update(dt);
+    this.seatPeople.forEach((p, i) => {
+      const st = this.seatState[i];
+      if (!st) return;
+      const phase = time * 1.4 + i * 1.7;
+      if (st === "eating") {
+        // 食べる: 右手を口もとへ上げ下げ
+        p.armR.rotation.x = -1.0 - Math.max(0, Math.sin(phase * 1.6)) * 0.9;
+        p.armL.rotation.x = -0.75;
+      } else if (st === "waitOrder") {
+        // 注文したくて手を挙げる
+        p.armR.rotation.x = -2.7 + Math.sin(phase * 3) * 0.15;
+        p.armL.rotation.x = -0.75;
+      } else {
+        p.armR.rotation.x = p.armL.rotation.x = -0.75 + Math.sin(phase) * 0.04;
+      }
+    });
+    this.queue.forEach((q, i) => {
+      if (q.visible) q.rotation.y = Math.PI + (((i * 37) % 11) - 5) * 0.04 + Math.sin(time * 0.6 + i * 2.1) * 0.05;
+    });
+  }
+
   /** 素材(食材のモデル)が読み込めたときに、作り直してもらう */
   invalidate(): void {
     for (const slots of [this.tableDish, this.tableDrink, this.stoveSlot, this.barSlot, this.passSlot]) for (const s of slots) s.reset();
@@ -234,6 +262,7 @@ export class GameView {
       const bar = this.bars[i]!;
       const bubble = this.bubbles[i]!;
       person.group.visible = seat !== null;
+      if (!seat) this.seatState[i] = "";
       bar.visible = bubble.visible = false;
       this.drinkMarks[i]!.visible = false;
       if (!seat) {
@@ -246,6 +275,7 @@ export class GameView {
         applyLook(person, lookFor(seat.id));
         this.seatLook[i] = seat.id;
       }
+      this.seatState[i] = seat.s;
       const eating = seat.s === "eating";
       bar.visible = !eating;
       if (!eating) {
@@ -292,6 +322,7 @@ export class GameView {
         return g2;
       });
       for (const m of this.kitchen.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
+      this.effects.setStation(i, cooking);
     });
     g.bars.forEach((id, i) => {
       const t = id === null ? undefined : byId.get(id);

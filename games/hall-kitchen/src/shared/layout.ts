@@ -111,3 +111,27 @@ export const QUEUE_MAX_SHOWN = 40;
 export function queueSpot(i: number): Spot {
   return { x: -8.8 + (i % 20) * 0.9, z: 9.35 - Math.floor(i / 20) * 0.45 };
 }
+
+// ---- 当たり判定(歩けないところ) ----
+// 家具や設備は通り抜けられない。見た目の大きさに合わせた四角形で表す。
+// 椅子は、お客さんが座っていて近づく必要があるので、ふさがない(テーブルだけ)。
+export interface Rect {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+const rect = (cx: number, cz: number, w: number, d: number): Rect => ({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 });
+
+export const OBSTACLES: Record<Role, Rect[]> = {
+  hall: [
+    ...TABLES.map((t) => rect(t.x, t.z, TABLE_SIZE[t.seats].w, TABLE_SIZE[t.seats].d)),
+    rect(9.4, 2.6, 1.0, 3.8), // ドリンクバー
+  ],
+  kitchen: [
+    ...STOVES.map((s) => (s.kind === "boil" ? rect(s.x, s.z, 1.0, 1.4) : rect(s.x, s.z, 1.8, 1.0))),
+    rect(FRIDGE.x, FRIDGE.z, 2.0, 0.85), // 冷蔵庫
+    rect(8.5, -8.8, 2.0, 1.0), // シンク
+    rect(9.4, -5, 1.0, 4.8), // 右の壁の作業台
+  ],
+};

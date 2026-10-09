@@ -1,6 +1,8 @@
 // 1部屋ぶんの状態と動きのルール。サーバー(正)とクライアント(予測)で同じ関数を使う。
 // ネットワークにも描画にも依存しない。
 
+import { OBSTACLES } from "./layout";
+
 export type Role = "hall" | "kitchen";
 
 export interface PlayerSnapshot {
@@ -35,6 +37,15 @@ export const SPAWN: Record<Role, { x: number; z: number; yaw: number }> = {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** 人の体の半径(m)。家具の四角形をこの分だけふくらませて、ぶつかりを判定する */
+export const PLAYER_RADIUS = 0.28;
+
+/** その位置に体を置くと、家具や設備にぶつかるか */
+export function blocked(role: Role, x: number, z: number): boolean {
+  const r = PLAYER_RADIUS;
+  return OBSTACLES[role].some((o) => x > o.x0 - r && x < o.x1 + r && z > o.z0 - r && z < o.z1 + r);
+}
+
 /** 入力 (mx, mz) と向き yaw から dt 秒ぶん動かした位置を返す */
 export function step(
   p: { x: number; z: number },
@@ -55,10 +66,19 @@ export function step(
   const vx = ix * Math.cos(yaw) + iz * -Math.sin(yaw);
   const vz = ix * -Math.sin(yaw) + iz * -Math.cos(yaw);
   const b = BOUNDS[role];
-  return {
-    x: clamp(p.x + vx * SPEED * dt, b.minX, b.maxX),
-    z: clamp(p.z + vz * SPEED * dt, b.minZ, b.maxZ),
-  };
+  // 一度に大きく動くと、家具を飛び越えてしまうので、10cm ずつに分けて動かす
+  const total = Math.hypot(vx, vz) * SPEED * dt;
+  const n = Math.max(1, Math.ceil(total / 0.1));
+  let { x, z } = p;
+  for (let i = 0; i < n; i++) {
+    const nx = clamp(x + (vx * SPEED * dt) / n, b.minX, b.maxX);
+    const nz = clamp(z + (vz * SPEED * dt) / n, b.minZ, b.maxZ);
+    // ぶつかるときは、壁に沿ってすべる(片方の軸だけ動く)。それもだめなら動かない
+    if (!blocked(role, nx, nz)) ({ x, z } = { x: nx, z: nz });
+    else if (!blocked(role, nx, z)) x = nx;
+    else if (!blocked(role, x, nz)) z = nz;
+  }
+  return { x, z };
 }
 
 export type JoinResult = "ok" | "full";

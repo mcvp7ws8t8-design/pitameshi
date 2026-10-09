@@ -73,14 +73,21 @@ URL に `?debug` を付けると、ブラウザのコンソールから `__debug
 |---|---|---|---|
 | `hdri/warehouse.hdr` | 金属(ステンレス)に映り込む室内の景色 | [Poly Haven](https://polyhaven.com/hdris) の HDRI を、[pmndrs/assets](https://github.com/pmndrs/assets) が小さくしたもの | CC0 |
 | `models/glass-vase-flowers.glb` | テーブルの花瓶 | [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) の Glass Vase with Flowers | CC0 |
-| `models/food/*.glb`(31個) | 食材と皿の3Dモデル | [Kenney](https://www.kenney.nl/) の Food Kit。[pmndrs/market-assets](https://github.com/pmndrs/market-assets) 経由で取得 | CC0 |
+| `models/food/*.glb`(43個) | 食材・皿・ドリンクの3Dモデル | [Kenney](https://www.kenney.nl/) の Food Kit。[pmndrs/market-assets](https://github.com/pmndrs/market-assets) 経由で取得 | CC0 |
 
 使えなかった素材: Poly Haven・ambientCG・Quaternius・Kenney・Sketchfab は、この開発環境のネットワークから接続できなかった。
 人や食べ物の実物に近いモデル、ステンレスやタイルの写真の質感は、これらのサイトからでないと手に入りにくい。
 環境のネットワーク設定でこれらのドメインを許可すれば、取り込める。
 
-### 食材のモデル(`models/food`)
+### 食材とドリンクのモデル(`models/food`)
 - 元のモデルは Draco 圧縮で、材質が「光に反応しない(unlit)」だった。取り込むときに [gltf-transform](https://gltf-transform.dev/) で圧縮を展開し、読み込み時に光と影に反応する材質へ置き換えている(`src/client/food.ts`)。
 - 食材40種のうち29種にモデルを割り当てた(`src/client/items.ts` の `ING_MODEL`)。モデルがない11種(スパゲッティ・中華麺・豆腐・白米・から揚げ肉・えび・いか・コロッケ・春巻き・れんこん・チキンカツ)は、コードで作った形のまま。
 - 生と調理後で別のモデルがあるもの(肉・卵・ベーコン)はそれを使い、ないものは色を寄せて焼き色・衣・煮汁の違いを出している。
 - Kenney のモデルは、角ばった低ポリゴンの見た目。写真のような質感ではない。
+- ドリンク20種は、すべてモデルを割り当てた(`DRINK_MODEL`)。お茶・ジュース・お酒の違いは、色寄せで出している。
+
+## 動き・音・当たり判定
+- **歩ける場所**(`src/shared/layout.ts` の `OBSTACLES`、`src/shared/room.ts` の `step`): テーブル、ドリンクバー、調理場、冷蔵庫、シンク、作業台は通り抜けられない。ぶつかると壁に沿ってすべる。椅子はふさがない(お客さんに近づくため)。サーバーとクライアントが同じ関数で動かすので、予測がずれない。テストで、触れるもの全部に立って届くこと、通路がふさがっていないことを確認している。
+- **湯気・煙・泡**(`src/client/effects.ts`): 調理中の調理場から出る(焼く→煙、茹でる→湯気、揚げる→油の泡)。冷蔵庫を開けると冷気が出る。
+- **お客さんの動き**(`src/client/view.ts` の `tick`): 注文待ちは手を挙げ、食事中は手を口もとへ上げ下げする。
+- **音**(`src/client/audio.ts`): 録音ファイルは使わず、Web Audio でその場で作る。換気扇のうなり、お客さんのざわめき、調理の音(ジュー・ぐつぐつ・パチパチ。調理中の台数で大きくなる)、注文が入る呼び出し音、操作の音、料理がさばけたとき・怒って帰ったとき、足音(厨房はタイル、ホールは木)、冷蔵庫の扉。ブラウザの決まりで、最初のクリックかキー入力のあとに鳴る。**M キー**でオン・オフ。キッチンの音は、ホールにいると小さく聞こえる。
