@@ -17,6 +17,8 @@ const WORD_LIST = Object.entries(ING).flatMap(([k, v]) => v.words.map(w => [w, k
 const detectIng = s => { const m = WORD_LIST.find(([w]) => s.includes(w)); return m ? m[1] : null; };
 const RECIPE_NAMES = [...RECIPES].sort((a, b) => b.name.length - a.name.length);
 const KIND_NAME = { S: "コンロ", F: "フライヤー", V: "オーブン" };
+const knownRecipe = name => recipes[name] || (vs ? CKData.canonicalSteps(RECIPE_BY_NAME[name]).map(x => ({ skill: x.skill, a: x.a })) : undefined);   // 対戦のAIはお手本を知っている
+const mine4 = (b, c) => !vs || c.team === b.team;
 const hasD = () => tiles.some(row => row.some(c => c.t === "D"));
 const hasTables = () => tiles.some(row => row.some(c => c.t === "B"));
 
@@ -96,9 +98,10 @@ function newBot(i) {
 }
 
 // ---- チャット欄 ----
+const myBots = () => players.filter(p => p.ai && (!vs || p.team === players[0].team));
 function buildWho() {
   const w = $("who"); w.innerHTML = "";
-  players.filter(p => p.ai).forEach((b, i) => {
+  myBots().forEach((b, i) => {
     const btn = document.createElement("button"); btn.type = "button"; btn.textContent = "🤖" + b.name;
     btn.style.background = b.col; btn.className = i === selBot ? "sel" : "";
     btn.onclick = () => { selBot = i; buildWho(); }; w.appendChild(btn);
@@ -140,15 +143,16 @@ function setupAiUi(nAi) {
   if (!nAi) return;
   selBot = 0; buildWho(); buildChips(); chatBox.innerHTML = "";
   const known = Object.keys(recipes);
-  players.filter(p => p.ai).forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
+  myBots().forEach(b => chat("ai", `${b.name}: ` + (known.length ? `よろしく! 覚えてる料理: ${known.join("、")}` : "はじめまして、新人です! 手順を教えてね。")));
   chat("ai", "ヒント: 「◯◯の作り方」で手順が見られるよ。名前で指示(例「ポチ、切って」)、「みんな、〜」で全員。");
   TUT.on = false; hlChip(null);
-  if (stage.id === 1 && !recipes["きざみレタス"]) tutStart();
+  if (vs) chat("tip", "対戦では、AIはお手本の手順を知っているよ。指示で動かすことも、「待って」で止めることもできるよ。");
+  if (stage.id === 1 && !vs && !endless && !recipes["きざみレタス"]) tutStart();
 }
 function sendCmd(text) {
   text = text.trim(); if (!text || state !== "play") return;
   chat("you", text);
-  const bots = players.filter(p => p.ai);
+  const bots = myBots();
   if (!bots.length) return;
   let targets = [bots[Math.min(selBot, bots.length - 1)]];
   if (/みんな|全員|ぜんいん/.test(text)) { targets = bots; text = text.replace(/みんな|全員|ぜんいん/g, ""); }
@@ -178,7 +182,7 @@ function runCmd(b, r) {
     return;
   }
   if (r.cmd === "make") {
-    const rec = recipes[r.dish.name];
+    const rec = knownRecipe(r.dish.name);
     if (!rec) { say(b, `${r.dish.name}の作り方、まだ知らないの。「${r.dish.name}の作り方」で手順を見て教えてね!`); return; }
     rec.forEach(s => b.queue.push({ ...s, src: "auto" }));
     say(b, `了解、${r.dish.name}作るね!`); return;
@@ -273,7 +277,7 @@ function planRaw(b, s) {
         (CRATE[c.t] && ING[CRATE[c.t]].rawOk && (!s.a || CRATE[c.t] === s.a) && (c.stock === null || c.stock > 0) && canAdd(h, { kind: "ing", type: CRATE[c.t], state: "raw" }));
       r = go(ok);
       if (r) return r;
-      if (tiles.some(row => row.some(c => isCooker(c.t) && c.stove === "cooking" && (!s.a || c.sitem.type === s.a)))) return { wait: true };
+      if (tiles.some(row => row.some(c => isCooker(c.t) && c.stove === "cooking" && mine4(b, c) && (!s.a || c.sitem.type === s.a)))) return { wait: true };
       return F("盛れるものがないよ");
     }
     case "deliver": {
@@ -369,7 +373,7 @@ function botUpdate(b, dt) {
     }
     if (c.s.skill === "deliver" && b.item === null) {
       b.fails = 0;
-      if (learned && !recipes[learned.name] && b.log.length) {
+      if (learned && !vs && !recipes[learned.name] && b.log.length) {
         recipes[learned.name] = b.log.map(x => ({ skill: x.skill, a: x.a })); saveRecipes();
         say(b, `${learned.name}、覚えた! 次からは「${learned.name}作って」でいいよ。`); tutLearned(learned.name);
       }
@@ -441,10 +445,10 @@ function resNeed(r) {
   return { boards: chopFinal + cookChop, cooks };
 }
 function resFits(b, r) {
-  const mine = resNeed(r), others = players.filter(q => q.ai && q !== b && q.res);
+  const mine = resNeed(r), others = players.filter(q => q.ai && q !== b && q.res && (!vs || q.team === b.team));
   if (!others.length) return true;
   const cap = { boards: 0, S: 0, F: 0, V: 0 };
-  tiles.flat().forEach(c => { if (c.t === "C") cap.boards++; else if (isCooker(c.t)) cap[c.t]++; });
+  tiles.flat().forEach(c => { if (!mine4(b, c)) return; if (c.t === "C") cap.boards++; else if (isCooker(c.t)) cap[c.t]++; });
   const used = { boards: 0, S: 0, F: 0, V: 0 };
   others.forEach(q => { used.boards += q.res.boards; for (const k of ["S", "F", "V"]) used[k] += q.res.cooks[k]; });
   return used.boards + mine.boards <= cap.boards && ["S", "F", "V"].every(k => used[k] + mine.cooks[k] <= cap[k]);
@@ -452,15 +456,15 @@ function resFits(b, r) {
 // キッチン担当: 覚えた料理で、まだ作られていない注文を作る
 function autoKitchen(b) {
   const prepared = [];
-  tiles.flat().forEach(c => { if (isCounter(c) && c.item && c.item.kind === "plate" && c.item.contents.length) prepared.push(plateKey(c.item)); });
-  players.forEach(q => { if (q.item && q.item.kind === "plate" && q.item.contents.length) prepared.push(plateKey(q.item)); });
+  tiles.flat().forEach(c => { if (mine4(b, c) && isCounter(c) && c.item && c.item.kind === "plate" && c.item.contents.length) prepared.push(plateKey(c.item)); });
+  players.forEach(q => { if ((!vs || q.team === b.team) && q.item && q.item.kind === "plate" && q.item.contents.length) prepared.push(plateKey(q.item)); });
   for (const o of [...orders].sort((x, y) => x.t - y.t)) {
-    if (!recipes[o.r.name] || players.some(q => q.ai && q.job === o)) continue;
+    if (!knownRecipe(o.r.name) || players.some(q => q.ai && q.job === o)) continue;
     const i = prepared.indexOf(needKey(o.r));
     if (i >= 0) { prepared.splice(i, 1); continue; }
     if (!resFits(b, o.r)) continue;
     b.job = o; b.res = resNeed(o.r); say(b, `${o.r.name}、作るね!`);
-    recipes[o.r.name].forEach(st => b.queue.push({ ...st, src: "auto" }));
+    knownRecipe(o.r.name).forEach(st => b.queue.push({ ...st, src: "auto" }));
     return true;
   }
   return false;
@@ -472,7 +476,7 @@ function autoPick(b, dt) {
   if (autoHeld(b)) return;
   const role = b.role || "any";
   if (role !== "hall") {
-    const burnt = tiles.flat().find(c => isCooker(c.t) && c.stove === "burnt" && !claimedByOther(b, c));
+    const burnt = tiles.flat().find(c => isCooker(c.t) && c.stove === "burnt" && mine4(b, c) && !claimedByOther(b, c));
     if (burnt) { b.claim = burnt; b.queue.push(...auto(["clean"])); return; }
   }
   if (role !== "kitchen" && autoHall(b)) return;
@@ -480,7 +484,7 @@ function autoPick(b, dt) {
   b.idleSay -= dt;
   if (b.idleSay <= 0) {
     b.idleSay = 15;
-    if (role !== "hall" && orders.some(o => !recipes[o.r.name])) say(b, "作り方を知らない注文があるよ…教えて!");
+    if (role !== "hall" && orders.some(o => !knownRecipe(o.r.name))) say(b, "作り方を知らない注文があるよ…教えて!");
     else say(b, "お客さん待ちだよ。");
   }
 }

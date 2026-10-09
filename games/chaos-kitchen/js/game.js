@@ -2,7 +2,7 @@
 // てんやわんやキッチン: ゲーム本体(ステージのデータで動く)
 const T = 80, MAPW = 960, MAPH = 640;
 const { ING, CRATE, RECIPES, RECIPE_BY_NAME, EVENTS, COOKERS, STATE_TAG } = CKData;
-const { STAGES, WORLDS, WALK } = CKStages;
+const { STAGES, WORLDS, WALK, ENDLESS, VS_STAGES } = CKStages;
 const $ = id => document.getElementById(id);
 const cv = $("c"), ctx = cv.getContext("2d");
 
@@ -24,10 +24,23 @@ let state = "home", paused = false;               // home / select / play / resu
 let players = [], orders = [], score = 0, timeLeft = 0, spawnIn = 0, popups = [], introT = 0, goals = [30, 40, 50];
 let plates = 0, platePending = [], spawnEvery = 20, selBot = 0, lastResult = null, served = 0;
 let ev = null, evNext = 25, banner = { txt: "", t: 0 }, lastSec = -1;
+// 対戦(チーム戦)とエンドレス。対戦はチームごとに 注文・お皿・得点 を持ち、操作するチームの分を一時的に orders/plates/score に差し替えて動かす
+let vs = null, endless = null, curTeam = 0;
+const TEAM_COL = ["#e8504a", "#4a8be8"], TEAM_NAME = ["赤チーム", "青チーム"];
+let teamActive = false;
+function asTeam(t, fn) {
+  if (!vs || t === undefined) return fn();
+  if (teamActive && curTeam === t) return fn();             // すでにそのチームとして動いている(入れ子)ときは、そのまま
+  const sv = [orders, plates, platePending, score, curTeam, teamActive];
+  orders = vs.orders[t]; plates = vs.plates[t]; platePending = vs.pending[t]; score = vs.score[t]; curTeam = t; teamActive = true;
+  try { return fn(); } finally { vs.plates[t] = plates; vs.score[t] = score; [orders, plates, platePending, score, curTeam, teamActive] = sv; }
+}
+const forTeams = fn => { if (!vs) fn(); else { asTeam(0, fn); asTeam(1, fn); } };
+const platesOf = c => (vs && c.team !== undefined ? vs.plates[c.team] : plates);
 const dark = document.createElement("canvas");
 
 // ---- 進み具合の保存 ----
-let prog = { stars: {}, best: {}, setup: { humans: 1, ai: 1 } };
+let prog = { stars: {}, best: {}, setup: { humans: 1, ai: 1 }, vsSetup: { humans: 1, teamSize: 1 }, endless: {}, vsRecord: { w: 0, l: 0, d: 0 } };
 try { Object.assign(prog, JSON.parse(localStorage.getItem("ck-prog") || "{}")); } catch {}
 if (prog.mode && !(prog.setup && prog.setup.humans)) prog.setup = legacySetup(prog.mode);     // 古い保存データを引き継ぐ
 function legacySetup(m) { return m === 2 ? { humans: 2, ai: 0 } : m >= 3 ? { humans: 1, ai: m - 2 } : { humans: 1, ai: 0 }; }
@@ -74,12 +87,13 @@ addEventListener("keyup", e => keys.delete(e.code));
 
 // ---- ステージ開始 ----
 function startStage(id, setup) {
-  stage = STAGES[id - 1];
+  stage = typeof id === "object" ? id : STAGES[id - 1];
+  if (stage.endless) stage.events = [];
   let tid = 0;
   tiles = stage.map.map((row, y) => [...row].map((t, x) => ({
     t, x, y, item: null, prog: 0, stove: "idle", sitem: null, need: 0, res: "", owner: null, dirty: 0,
     tb: t === "B" ? { id: ++tid, state: "empty", t: 0, max: 1, ticket: null, pts: 0, who: "" } : null,
-    stock: CRATE[t] && stage.stock ? stage.stock : null, regen: 0,
+    stock: CRATE[t] && stage.stock ? stage.stock : null, regen: 0, team: stage.versus ? (x < row.length / 2 ? 0 : 1) : undefined,
   })));
   H = tiles.length; W = tiles[0].length;
   tiles.forEach(row => row.forEach(c => { c.inner = c.t === "#" && ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => tiles[c.y + dy] && tiles[c.y + dy][c.x + dx] && WALK.has(tiles[c.y + dy][c.x + dx].t)); }));
@@ -90,20 +104,37 @@ function startStage(id, setup) {
   dark.width = W * T; dark.height = H * T;
   plates = stage.plates; platePending = [];
   if (typeof setup === "number") setup = legacySetup(setup);
-  let humans = Math.max(1, Math.min(maxHumans(), setup.humans || 1)), nAi = Math.max(0, Math.min(3, setup.ai || 0));
-  nAi = Math.min(nAi, 4 - humans); while (humans + nAi < stage.minPlayers && humans + nAi < 4) nAi++;
-  players = assignInputs(humans).map((inp, i) => ({ x: 0, y: 0, dir: [0, 1], item: null, col: HCOL[i], keys: inp.keys, pad: inp.pad }));
-  for (let i = 0; i < nAi; i++) players.push(newBot(i));
-  players.forEach((p, i) => { [p.x, p.y] = stage.spawns[i]; });
-  spawnEvery = Math.max(7, Math.round(stage.spawn * 4.5 / (nAi + 1.5 * humans)));   // 人手が多いほど、お客は早く来る
+  let humans, nAi;
+  vs = null; endless = null;
+  if (stage.versus) {                                       // 対戦: 赤と青のチーム(人間は交互に振り分け、足りない分はAI)
+    const size = setup.teamSize === 2 ? 2 : 1, total = size * 2;
+    humans = Math.max(1, Math.min(maxHumans(), total, setup.humans || 1));
+    players = assignInputs(humans).map((inp, i) => ({ x: 0, y: 0, dir: [0, 1], item: null, col: TEAM_COL[i % 2], team: i % 2, keys: inp.keys, pad: inp.pad }));
+    const cnt = [0, 0]; players.forEach(p => cnt[p.team]++);
+    let bi = 0; for (const t of [0, 1]) while (cnt[t] < size) { const b = newBot(bi++); b.team = t; b.col = TEAM_COL[t]; b.auto = true; b.role = "kitchen"; cnt[t]++; players.push(b); }
+    nAi = players.length - humans;
+    const used = [0, 0]; players.forEach(p => { [p.x, p.y] = stage.spawns[p.team * 2 + used[p.team]++]; });
+    vs = { score: [0, 0], orders: [[], []], plates: [stage.plates, stage.plates], pending: [[], []] };
+    prog.vsSetup = { humans, teamSize: size };
+    spawnEvery = stage.spawn;
+  } else {
+    humans = Math.max(1, Math.min(maxHumans(), setup.humans || 1)); nAi = Math.max(0, Math.min(3, setup.ai || 0));
+    nAi = Math.min(nAi, 4 - humans); while (humans + nAi < stage.minPlayers && humans + nAi < 4) nAi++;
+    players = assignInputs(humans).map((inp, i) => ({ x: 0, y: 0, dir: [0, 1], item: null, col: HCOL[i], keys: inp.keys, pad: inp.pad }));
+    for (let i = 0; i < nAi; i++) players.push(newBot(i));
+    players.forEach((p, i) => { [p.x, p.y] = stage.spawns[i]; });
+    spawnEvery = Math.max(7, Math.round(stage.spawn * 4.5 / (nAi + 1.5 * humans)));   // 人手が多いほど、お客は早く来る
+    prog.setup = { humans, ai: nAi };
+    if (stage.endless) endless = { lives: 5, t: 0, lvl: -1, n: 0, k: 4.5 / (nAi + 1.5 * humans) };
+  }
   const avgNeed = stage.menu.reduce((a, n) => a + RECIPE_BY_NAME[n].need.length, 0) / stage.menu.length;
   const base = (1 + stage.time / spawnEvery) * (22 + 7 * (avgNeed - 1));
   goals = [0.35, 0.65, 0.95].map(f => Math.max(30, Math.round(base * f / 10) * 10));
   goals[1] = Math.max(goals[1], goals[0] + 10); goals[2] = Math.max(goals[2], goals[1] + 10);
-  served = 0; orders = []; score = 0; popups = []; timeLeft = stage.time; spawnIn = 0; ev = null; banner.t = 0;
+  served = 0; orders = []; score = 0; popups = []; timeLeft = endless ? 1e9 : stage.time; spawnIn = 0; ev = null; banner.t = 0;
   evNext = stage.events.length ? stage.evGap * 0.8 : 1e9;
   introT = stage.tip ? 5 : 3; paused = false; state = "play";
-  prog.setup = { humans, ai: nAi }; saveProg();
+  saveProg();
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   setupAiUi(nAi);
   Snd.play("click"); Snd.music({ world: stage.world });
@@ -145,8 +176,7 @@ function tableAct(p, c, h) {
 const ticketPts = o => (20 + 8 * (o.r.need.length - 1) + Math.floor(o.t / 5)) * (isEv("rush") ? 2 : 1);
 
 function interact(p) {
-  const before = p.item; interactCore(p);
-  if (p.item !== before) Snd.play(p.item ? "pick" : "put");
+  asTeam(p.team, () => { const before = p.item; interactCore(p); if (p.item !== before) Snd.play(p.item ? "pick" : "put"); });
 }
 function interactCore(p) {
   const c = target(p); if (!c) return;
@@ -220,7 +250,37 @@ function interactCore(p) {
 }
 
 const isEv = n => ev && ev.type === n;
-const ordCap = () => Math.min(6, 3 + players.filter(p => p.ai).length) + (isEv("rush") ? 2 : 0);
+const ordCap = () => vs ? 4 : Math.min(6, 3 + players.filter(p => p.ai).length) + (isEv("rush") ? 2 : 0);
+const endlessMenu = () => stage.menu.slice(0, Math.min(stage.menu.length, 2 + Math.floor(endless.t / 45)));
+function spawnTicket() {                                      // 注文を出す(対戦は、同じ注文を両チームに同時に出す)
+  const pat = endless ? Math.max(40, Math.round(stage.patience - endless.t / 6)) : stage.patience;
+  const menu = endless ? endlessMenu() : stage.menu, r = RECIPE_BY_NAME[menu[Math.floor(Math.random() * menu.length)]];
+  if (vs) { for (const t of [0, 1]) if (vs.orders[t].length < ordCap()) vs.orders[t].push({ r, t: pat, max: pat }); }
+  else if (orders.length < ordCap()) orders.push({ r, t: pat, max: pat });
+}
+function tickPlates(dt) { for (let i = platePending.length - 1; i >= 0; i--) { platePending[i] -= dt; if (platePending[i] <= 0) { platePending.splice(i, 1); plates++; } } }
+function tickOrders(dt) {
+  for (const o of orders) o.t -= dt;
+  for (let i = orders.length - 1; i >= 0; i--) if (orders[i].t <= 0) {
+    const o = orders.splice(i, 1)[0]; score -= 10;
+    if (o.tile) { popup("-10 待たせすぎ", o.tile.x + 0.5, o.tile.y + 0.5, "#ff7777"); o.tile.tb.state = "empty"; o.tile.tb.ticket = null; }
+    else popup(endless ? "💔 注文を逃した!" : "-10 時間切れ", vs ? W * (curTeam ? 0.75 : 0.25) : W / 2, 0.6, "#ff7777");
+    if (endless) { endless.lives--; Snd.play("wrong"); shake = 0.6; }
+  }
+}
+// エンドレス: だんだん注文が速く・多く・難しくなる
+function endlessStep(dt) {
+  endless.t += dt; const t = endless.t;
+  spawnEvery = Math.max(6, Math.round(Math.max(7, stage.spawn - t / 8) * endless.k));
+  const n = Math.min(stage.menu.length, 2 + Math.floor(t / 45));
+  if (n > endless.n) { if (endless.n) banner = { txt: `🆕 新メニュー: ${stage.menu[n - 1]}`, t: 3.5 }; endless.n = n; }
+  const lvl = t < 90 ? 0 : t < 200 ? 1 : 2;
+  if (lvl !== endless.lvl) {
+    endless.lvl = lvl; stage.events = [[], ["mouse", "fire"], ["mouse", "fire", "rush", "blackout", "slippery"]][lvl];
+    if (lvl && evNext > 1e8) evNext = 10;
+    if (lvl) banner = { txt: lvl === 1 ? "🔥 ここからが本番!" : "💥 大混乱タイム!", t: 3.5 };
+  }
+}
 
 function update(dt) {
   PADS = pollPads();
@@ -233,13 +293,13 @@ function update(dt) {
   evNext -= dt;
   if (ev) { ev.t -= dt; if (ev.t <= 0) { ev = null; evNext = stage.evGap * (0.7 + Math.random() * 0.6); } }
   else if (evNext <= 0 && timeLeft > 12) startEvent();
-  for (let i = platePending.length - 1; i >= 0; i--) { platePending[i] -= dt; if (platePending[i] <= 0) { platePending.splice(i, 1); plates++; } }
+  if (endless) endlessStep(dt);
+  forTeams(() => tickPlates(dt));
   spawnIn -= dt;
   const tbs = tiles.flat().filter(c => c.t === "B");
   if (spawnIn <= 0) {
-    if (stage.mode === "kitchen") {
-      if (orders.length < ordCap()) orders.push({ r: RECIPE_BY_NAME[stage.menu[Math.floor(Math.random() * stage.menu.length)]], t: stage.patience, max: stage.patience });
-    } else {
+    if (stage.mode === "kitchen") spawnTicket();
+    else {
       const busy = tbs.filter(c => c.tb.state !== "empty").length, free = tbs.filter(c => c.tb.state === "empty");
       if (free.length && busy < Math.min(tbs.length, ordCap())) {
         const c = free[Math.floor(Math.random() * free.length)];
@@ -248,12 +308,8 @@ function update(dt) {
     }
     spawnIn = isEv("rush") ? spawnEvery / 2 : spawnEvery;
   }
-  for (const o of orders) o.t -= dt;
-  for (let i = orders.length - 1; i >= 0; i--) if (orders[i].t <= 0) {
-    const o = orders.splice(i, 1)[0]; score -= 10;
-    if (o.tile) { popup("-10 待たせすぎ", o.tile.x + 0.5, o.tile.y + 0.5, "#ff7777"); o.tile.tb.state = "empty"; o.tile.tb.ticket = null; }
-    else popup("-10 時間切れ", W / 2, 0.6, "#ff7777");
-  }
+  forTeams(() => tickOrders(dt));
+  if (endless && endless.lives <= 0) { finishStage(); return; }
   for (const c of tbs) {
     const tb = c.tb;
     if (tb.state === "order") { tb.t -= dt; if (tb.t <= 0) { tb.state = "empty"; score -= 10; popup("-10 帰っちゃった", c.x + 0.5, c.y + 0.5, "#ff7777"); } }
@@ -264,7 +320,7 @@ function update(dt) {
     const ox = p.x, oy = p.y;
     const on = tiles[Math.floor(p.y)] && tiles[Math.floor(p.y)][Math.floor(p.x)];
     if (on && ARROW[on.t] && !p.ai) moveBy(p, ARROW[on.t][0] * 1.6 * dt, ARROW[on.t][1] * 1.6 * dt);      // ベルトコンベア(AIは流されない)
-    if (p.ai) { botUpdate(p, dt); work(p, target(p), p.chopping, dt); trackMove(p, ox, oy, dt); continue; }
+    if (p.ai) { asTeam(p.team, () => { botUpdate(p, dt); work(p, target(p), p.chopping, dt); }); trackMove(p, ox, oy, dt); continue; }
     const K = p.keys, gp = p.pad !== undefined ? PADS.find(g => g.index === p.pad) : null;
     let dx = K ? (keys.has(K.right) ? 1 : 0) - (keys.has(K.left) ? 1 : 0) : 0;
     let dy = K ? (keys.has(K.down) ? 1 : 0) - (keys.has(K.up) ? 1 : 0) : 0;
@@ -340,6 +396,23 @@ function moveBy(p, dx, dy) {
 // ---- 結果 ----
 function finishStage() {
   state = "result"; $("pauseBtn").style.display = "none";
+  if (vs) {                                                      // 対戦: 点数の高いチームの勝ち
+    const [a, b] = vs.score, winner = a > b ? 0 : b > a ? 1 : -1, mine = players.filter(p => !p.ai).map(p => p.team);
+    const humanWon = winner >= 0 && mine.includes(winner) && !mine.includes(1 - winner);
+    if (winner < 0) prog.vsRecord.d++; else if (humanWon) prog.vsRecord.w++; else if (!(mine.includes(0) && mine.includes(1))) prog.vsRecord.l++;
+    saveProg();
+    lastResult = { kind: "vs", id: stage.id, a, b, winner, humanWon };
+    Snd.stop(); Snd.play(winner < 0 ? "star" : humanWon || (mine.includes(0) && mine.includes(1)) ? "win" : "lose");
+    showResult(); return;
+  }
+  if (endless) {                                                 // エンドレス: 生き残った時間と点数
+    const t = Math.floor(endless.t), prev = prog.endless[stage.id] || { score: -1, time: 0 }, newBest = score > prev.score;
+    if (newBest) prog.endless[stage.id] = { score, time: t };
+    saveProg();
+    lastResult = { kind: "endless", id: stage.id, score, time: t, newBest };
+    Snd.stop(); Snd.play(t >= 120 ? "win" : "star");
+    showResult(); return;
+  }
   const stars = goals.filter(g => score >= g).length;
   const id = stage.id, prev = prog.stars[id] || 0, newBest = score > (prog.best[id] || -1e9);
   if (stars > prev) prog.stars[id] = stars;
@@ -374,7 +447,7 @@ function navMove(dx, dy) {
 function navBack() {
   if (paused) { setPause(false); return; }
   const scr = [...document.querySelectorAll("#ui .scr")].find(e => e.style.display !== "none"); if (!scr) return;
-  if (scr.id === "scr-select") $("selBack").click(); else if (scr.id === "scr-result") $("resSelect").click(); else if (scr.id === "scr-help") $("helpBack").click(); else if (scr.id === "scr-settings") $("setBack").click();
+  if (scr.id === "scr-select") $("selBack").click(); else if (scr.id === "scr-result") $("resSelect").click(); else if (scr.id === "scr-arena") $("arBack").click(); else if (scr.id === "scr-help") $("helpBack").click(); else if (scr.id === "scr-settings") $("setBack").click();
 }
 let navT = 0, navDir = "";
 function padMenu(dt) {                                       // ポーズ中・メニュー中のコントローラー操作
@@ -398,12 +471,12 @@ addEventListener("keydown", e => {
 ["pointerdown", "mousemove"].forEach(ev => addEventListener(ev, () => document.body.classList.remove("padnav")));
 
 // ---- 画面(ホーム・ステージ選択・結果・ポーズ) ----
-const SCREENS = ["home", "select", "result", "pause", "help", "settings"];
+const SCREENS = ["home", "select", "result", "pause", "help", "settings", "arena"];
 function showScreen(name) {
   SCREENS.forEach(s => { $("scr-" + s).style.display = s === name ? "flex" : "none"; });
   $("ui").style.display = name ? "flex" : "none";
   if (name && !matchMedia("(pointer:coarse)").matches) setTimeout(focusDefault, 30);
-  if (name === "home" || name === "select" || name === "help" || name === "settings") { Snd.music({ menu: true, world: selWorld }); state = name; $("touch").style.display = "none"; $("aiUi").style.display = "none"; $("pauseBtn").style.display = "none"; }
+  if (name === "home" || name === "select" || name === "help" || name === "settings" || name === "arena") { Snd.music({ menu: true, world: selWorld }); state = name; $("touch").style.display = "none"; $("aiUi").style.display = "none"; $("pauseBtn").style.display = "none"; }
 }
 function setPause(v) { paused = v; showScreen(v ? "pause" : null); if (v) $("ui").style.display = "flex"; keys.clear(); }
 
@@ -471,8 +544,11 @@ function confetti() {
     document.body.appendChild(d); setTimeout(() => d.remove(), 4500);
   }
 }
+const endlessRank = t => t < 60 ? "見習いコック" : t < 150 ? "一人前のコック" : t < 300 ? "名コック" : "伝説のシェフ";
 function showResult() {
-  const r = lastResult, s = STAGES[r.id - 1];
+  const r = lastResult;
+  if (r.kind) { showArenaResult(r); return; }
+  const s = STAGES[r.id - 1];
   $("scr-result").style.setProperty("--wc", WORLD_COL[s.world - 1]);
   $("resTitle").textContent = `${s.emoji} ${s.world}-${s.k} ${s.name}`;
   $("resStars").innerHTML = [0, 1, 2].map(i => `<span class="${i < r.stars ? "on" : ""}" style="--d:${0.25 + i * 0.35}s">★</span>`).join("");
@@ -487,11 +563,34 @@ function showResult() {
   showScreen("result");
   if (r.stars === 3) confetti();
 }
+function showArenaResult(r) {                                    // 対戦・エンドレスの結果
+  const st = r.kind === "vs" ? VS_STAGES.find(a => a.id === r.id) : ENDLESS.find(a => a.id === r.id);
+  $("scr-result").style.setProperty("--wc", WORLD_COL[st.world - 1]);
+  $("resTitle").textContent = `${st.emoji} ${st.name}`;
+  $("resNext").style.display = "none";
+  if (r.kind === "vs") {
+    $("resStars").innerHTML = `<span class="on vsr" style="color:${TEAM_COL[0]};--d:.2s">${r.a}</span><span class="vsr" style="opacity:1;transform:none;font-size:30px;color:#fff">VS</span><span class="on vsr" style="color:${TEAM_COL[1]};--d:.5s">${r.b}</span>`;
+    $("resScore").textContent = r.winner < 0 ? "🤝 引き分け!" : `🏆 ${TEAM_NAME[r.winner]}の勝ち!`;
+    $("resGoals").textContent = `通算(人間): ${prog.vsRecord.w}勝 ${prog.vsRecord.l}敗 ${prog.vsRecord.d}分`;
+    $("resMsg").textContent = "";
+    if (r.winner >= 0) confetti();
+  } else {
+    const m = Math.floor(r.time / 60), sec = r.time % 60;
+    $("resStars").innerHTML = `<span class="on vsr" style="--d:.2s;font-size:44px">⏱ ${m}分${sec}秒</span>`;
+    $("resScore").textContent = `${r.score}点${r.newBest ? " 🎉ベスト更新!" : ""}`;
+    $("resGoals").textContent = `称号: ${endlessRank(r.time)}`;
+    $("resMsg").textContent = "";
+    if (r.time >= 120) confetti();
+  }
+  $("resRetry").onclick = () => startStage(st, r.kind === "vs" ? prog.vsSetup : prog.setup);
+  $("resSelect").onclick = () => { arenaKind = r.kind; renderArena(); showScreen("arena"); };
+  showScreen("result");
+}
 $("homeStart").onclick = () => { renderSelect(); showScreen("select"); };
 $("selBack").onclick = () => { renderHome(); showScreen("home"); };
 $("pauseBtn").onclick = () => setPause(true);
 $("pauseResume").onclick = () => setPause(false);
-$("pauseQuit").onclick = () => { paused = false; state = "select"; renderSelect(); showScreen("select"); };
+$("pauseQuit").onclick = () => { paused = false; if (stage && (stage.versus || stage.endless)) { arenaKind = stage.versus ? "vs" : "endless"; renderArena(); showScreen("arena"); } else { state = "select"; renderSelect(); showScreen("select"); } };
 
 // ---- スマホ操作 ----
 let joy = { x: 0, y: 0 }, touchChop = false;
@@ -547,3 +646,42 @@ function renderSettings() {
 }
 function getGfx() { try { const v = localStorage.getItem("ck-gfx"); if (v) return v; } catch {} return matchMedia("(pointer:coarse)").matches ? "low" : "high"; }
 function setGfx(v) { try { localStorage.setItem("ck-gfx", v); } catch {} if (typeof applyQuality === "function") applyQuality(v); }
+
+// ---- 対戦モード・エンドレス ----
+let arenaKind = "vs", arenaIdx = 0;
+$("homeVs").onclick = () => { arenaKind = "vs"; arenaIdx = 0; renderArena(); showScreen("arena"); };
+$("homeEndless").onclick = () => { arenaKind = "endless"; arenaIdx = 0; renderArena(); showScreen("arena"); };
+$("arBack").onclick = () => { renderHome(); showScreen("home"); };
+function segBox(id, vals, cur, disabled, label, set) {
+  const box = $(id); box.innerHTML = "";
+  vals.forEach(v => { const b = document.createElement("button"); b.textContent = label(v); b.disabled = disabled(v); if (v === cur) b.classList.add("sel"); b.onclick = () => { set(v); saveProg(); Snd.play("click"); renderArena(); }; box.appendChild(b); });
+}
+function renderArena() {
+  const vsMode = arenaKind === "vs", list = vsMode ? VS_STAGES : ENDLESS, a = list[arenaIdx], mh = maxHumans();
+  $("scr-arena").style.setProperty("--wc", WORLD_COL[a.world - 1]);
+  $("arTitle").textContent = vsMode ? "⚔ 対戦モード" : "♾ エンドレス";
+  const lst = $("arList"); lst.innerHTML = "";
+  list.forEach((x, i) => { const b = document.createElement("button"); b.style.setProperty("--wc", WORLD_COL[x.world - 1]); if (i === arenaIdx) b.classList.add("sel"); b.innerHTML = `<span>${x.emoji}</span>${x.name}`; b.onclick = () => { arenaIdx = i; Snd.play("click"); renderArena(); }; lst.appendChild(b); });
+  const dishes = a.menu.map(n => `<span class="dish">${RECIPE_BY_NAME[n].need.map(k => ING[k.split(":")[0]].emoji).join("")} ${n}</span>`).join("");
+  const best = vsMode ? `通算(人間): ${prog.vsRecord.w}勝 ${prog.vsRecord.l}敗 ${prog.vsRecord.d}分` : (prog.endless[a.id] ? `ベスト: ${prog.endless[a.id].score}点 / ${Math.floor(prog.endless[a.id].time / 60)}分${prog.endless[a.id].time % 60}秒` : "ベスト: -");
+  $("arInfo").innerHTML = `<h3>${a.emoji} ${a.name}</h3><div>${a.gimmicks.map(g => `<span class="tag">${g}</span>`).join("")}<span class="tag">${vsMode ? "⏱ 120秒" : "♾ 注文を5回逃すと終わり"}</span></div>
+    <div style="margin:4px 0">${a.desc || ""}</div><div>${vsMode ? "同じ注文が両チームに出る。先にさばいたチームの得点!" : "料理は時間とともに増える(" + dishes.length + "→最後は難しい料理も)。"}</div><div style="margin-top:4px">${dishes}</div><div class="goal" style="margin-top:6px;font-weight:800;font-size:13px;color:#6b5a8c">${best}</div>`;
+  const pads = connectedPads().length;
+  if (vsMode) {
+    let { humans, teamSize } = prog.vsSetup; teamSize = teamSize === 2 ? 2 : 1; humans = Math.max(1, Math.min(mh, teamSize * 2, humans)); prog.vsSetup = { humans, teamSize };
+    $("arRowSize").style.display = ""; $("arRowAi").style.display = "none";
+    segBox("arSize", [1, 2], teamSize, () => false, v => v + "対" + v, v => { prog.vsSetup.teamSize = v; });
+    segBox("arHumans", [1, 2, 3, 4], humans, v => v > Math.min(mh, teamSize * 2), v => "👨‍🍳".repeat(v), v => { prog.vsSetup.humans = v; });
+    const inputs = assignInputs(humans), teams = [[], []];
+    inputs.forEach((d, i) => teams[i % 2].push(`${i + 1}P(${d.pad !== undefined ? "🎮" : d.keys === KB1 ? "WASD" : "矢印"})`));
+    for (const t of [0, 1]) while (teams[t].length < teamSize) teams[t].push("🤖AI");
+    $("arDev").textContent = `${TEAM_NAME[0]}: ${teams[0].join(" + ")}　VS　${TEAM_NAME[1]}: ${teams[1].join(" + ")}　(コントローラー ${pads}台)`;
+  } else {
+    let { humans, ai } = prog.setup; humans = Math.max(1, Math.min(mh, humans)); ai = Math.max(0, Math.min(4 - humans, ai)); prog.setup = { humans, ai };
+    $("arRowSize").style.display = "none"; $("arRowAi").style.display = "";
+    segBox("arHumans", [1, 2, 3, 4], humans, v => v > mh, v => "👨‍🍳".repeat(v), v => { prog.setup.humans = v; });
+    segBox("arAi", [0, 1, 2, 3], ai, v => humans + v > 4, v => v ? "🤖".repeat(v) : "なし", v => { prog.setup.ai = v; });
+    $("arDev").textContent = assignInputs(humans).map((d, i) => `${i + 1}P ${d.pad !== undefined ? "🎮" : d.keys === KB1 ? "⌨️WASD" : "⌨️矢印"}`).join("　") + `　(コントローラー ${pads}台)　AIは「◯◯作って」「おまかせ」で動かせます`;
+  }
+  $("arGo").onclick = () => startStage(a, vsMode ? prog.vsSetup : prog.setup);
+}

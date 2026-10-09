@@ -96,7 +96,7 @@ const ticketIcons = r => r.need.map(k => { const [t, s] = k.split(":"); return I
 function drawFloor(c, x, y, hall) {
   const px = x * T, py = y * T, chk = (x + y) & 1;
   let a, b;
-  if (c.t === "~") { a = PAL.iceA; b = PAL.iceB; } else if (hall) { a = PAL.hallA; b = PAL.hallB; } else { a = PAL.floorA; b = PAL.floorB; }
+  if (stage.versus && c.t !== "~") { const tm = x < W / 2; a = tm ? "#ffe4e0" : "#e0ecff"; b = tm ? "#ffd0ca" : "#cadfff"; } else if (c.t === "~") { a = PAL.iceA; b = PAL.iceB; } else if (hall) { a = PAL.hallA; b = PAL.hallB; } else { a = PAL.floorA; b = PAL.floorB; }
   ctx.fillStyle = chk ? a : b; ctx.fillRect(px, py, T, T);
   if (c.t === "~") { ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(px + 14, py + 24); ctx.lineTo(px + 30, py + 14); ctx.moveTo(px + 46, py + 62); ctx.lineTo(px + 66, py + 50); ctx.stroke(); ctx.lineCap = "butt"; }
 }
@@ -171,7 +171,7 @@ function drawStation(c, x, y, tnow) {
   drawCounterBase(px, py, t === "K" ? "#ffe9a8" : PAL.woodHi);
   if (t === "P") {
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(cx, cy + 4 - i * 6, 24, 11, 0, 0, 7); paint("#fff", PAL.ink, 2); ctx.beginPath(); ctx.ellipse(cx, cy + 4 - i * 6, 15, 6, 0, 0, 7); paint("#dfe9ff"); }
-    rr(cx - 20, py + T - 24, 40, 18, 9); paint("#fff", PAL.ink, 2); txt(`×${plates}`, cx, py + T - 15, 14, "center", plates ? PAL.ink : PAL.tomato);
+    rr(cx - 20, py + T - 24, 40, 18, 9); paint("#fff", PAL.ink, 2); txt(`×${platesOf(c)}`, cx, py + T - 15, 14, "center", platesOf(c) ? PAL.ink : PAL.tomato);
   } else if (t === "Z") {
     rr(px + 8, py + 10, T - 16, T - 26, 12); paint(PAL.steel, PAL.ink, 3);
     rr(px + 15, py + 22, T - 30, T - 44, 10); paint("#8fd8ff", PAL.ink, 2);
@@ -316,7 +316,55 @@ function wrapText(s, x, y, maxW, size, lh, col = PAL.ink) {
   return lines.length;
 }
 
+// 注文票の列(対戦・エンドレスでも使う)
+function ticketRow(list, x0, maxW, tnow, cwMax = 140) {
+  const on = list.length, cw = Math.min(cwMax, Math.floor(maxW / Math.max(1, on)) - 6);
+  list.forEach((o, i) => {
+    const x = x0 + i * (cw + 6), low2 = o.t < 12, wob = low2 ? Math.sin(tnow * 14 + i) * 1.5 : 0, y = 648;
+    ctx.save(); ctx.translate(wob, 0);
+    rr(x, y, cw, 68, 10); paint("#fffbe9", PAL.ink, 3);
+    rr(x, y, cw, 22, 10); paint(low2 ? PAL.tomato : PAL.pink, PAL.ink, 3);
+    ctx.fillStyle = low2 ? PAL.tomato : PAL.pink; ctx.fillRect(x + 3, y + 12, cw - 6, 8);
+    txt(`${o.table ? o.table + "番 " : ""}${o.r.name}`, x + cw / 2, y + 12, cw < 120 ? 12 : 14, "center", "#fff", PAL.ink);
+    txt(ticketIcons(o.r), x + cw / 2, y + 43, o.r.need.length > 2 ? 14 : 18, "center", PAL.ink);
+    rr(x + 6, y + 56, cw - 12, 7, 3.5); paint("rgba(58,43,87,.18)");
+    const fr2 = Math.max(0, o.t / o.max); if (fr2 > 0.02) { rr(x + 6, y + 56, Math.max(7, (cw - 12) * fr2), 7, 3.5); paint(low2 ? PAL.tomato : PAL.mint); }
+    ctx.restore();
+  });
+}
+function hudBar() {
+  ctx.fillStyle = PAL.ink; ctx.fillRect(0, MAPH, cv.width, cv.height - MAPH);
+  ctx.fillStyle = PAL.sun; ctx.fillRect(0, MAPH, cv.width, 4);
+  ctx.fillStyle = "rgba(255,255,255,.05)"; for (let i = 0; i < 24; i++) ctx.fillRect(i * 44, MAPH + 4, 22, cv.height);
+}
+function drawHudVs(tnow) {                                   // 対戦: 左=赤チーム 中央=時間 右=青チーム
+  hudBar();
+  const f = Math.max(0, timeLeft) / stage.time, low = timeLeft < 20;
+  ctx.save(); ctx.translate(480, 680); ctx.scale(low ? 1 + Math.sin(tnow * 10) * 0.05 : 1, low ? 1 + Math.sin(tnow * 10) * 0.05 : 1);
+  circ(0, 0, 30, "#fff", PAL.ink, 3); ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 25, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.closePath(); ctx.fillStyle = low ? PAL.tomato : PAL.mint; ctx.fill();
+  circ(0, 0, 17, "#fff", PAL.ink, 2.5); txt(String(Math.max(0, Math.ceil(timeLeft))), 0, 1, 20, "center", low ? PAL.tomato : PAL.ink, null, FONT_POP); ctx.restore();
+  for (const t of [0, 1]) {
+    const left = t === 0, sx = left ? 20 : 940, al = left ? "left" : "right", col = TEAM_COL[t];
+    rr(left ? 14 : 826, 652, 120, 60, 14); paint(col, "#fff", 3);
+    txt(TEAM_NAME[t], left ? 74 : 886, 668, 14, "center", "#fff", PAL.ink);
+    txt(String(vs.score[t]), left ? 74 : 886, 696, 30, "center", "#fff", PAL.ink, FONT_POP);
+    const lst = vs.orders[t], x0 = left ? 142 : 502, cw = Math.min(104, Math.floor(318 / Math.max(1, lst.length)) - 6);
+    ticketRow(lst.slice(0, 3), x0, 318, tnow, 104);
+  }
+}
+function drawHudEndless(tnow) {                              // エンドレス: ハート・生き残った時間・点数
+  hudBar();
+  const t = endless.t, m = Math.floor(t / 60), sec = Math.floor(t % 60);
+  ctx.save(); ctx.translate(46, 680);
+  circ(0, 0, 30, "#fff", PAL.ink, 3); ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 25, -Math.PI / 2, -Math.PI / 2 + ((t % 60) / 60) * Math.PI * 2); ctx.closePath(); ctx.fillStyle = PAL.sky; ctx.fill();
+  circ(0, 0, 18, "#fff", PAL.ink, 2.5); txt(`${m}:${String(sec).padStart(2, "0")}`, 0, 1, 14, "center", PAL.ink, null, FONT_POP); ctx.restore();
+  txt("SCORE", 96, 658, 12, "left", "#b9a8e6"); txt(String(score), 96, 676, 28, "left", "#fff", PAL.plum, FONT_POP);
+  for (let i = 0; i < 5; i++) { ctx.globalAlpha = i < endless.lives ? 1 : 0.25; const pulse = endless.lives === 1 && i === 0 ? 1 + Math.sin(tnow * 10) * 0.12 : 1; emo("❤️", 110 + i * 30, 706, 22 * pulse); ctx.globalAlpha = 1; }
+  ticketRow(orders, 392, 548, tnow);
+}
 function drawHud(tnow) {
+  if (vs) return drawHudVs(tnow);
+  if (endless) return drawHudEndless(tnow);
   // 下のバー
   ctx.fillStyle = PAL.ink; ctx.fillRect(0, MAPH, cv.width, cv.height - MAPH);
   ctx.fillStyle = PAL.sun; ctx.fillRect(0, MAPH, cv.width, 4);

@@ -23,6 +23,21 @@ const force2d = process.argv.includes("--2d");
     }, id);
     check(`ステージ${id}を最後まで`, r.served > 0, JSON.stringify(r));
   }
+  // 対戦: 何もしない人間チーム vs AIチーム → AI側が勝つ。壁の向こうへは行かない
+  const v = await p.evaluate(() => {
+    startStage(VS_STAGES[0], { humans: 1, teamSize: 1 }); introT = 0;
+    let n = 0, cross = 0; while (state === "play" && n < 20000) { update(0.05); n++; if (n % 5 === 0) for (const q of players) if (q.team === 0 ? q.x > W / 2 : q.x < W / 2) cross++; if (n % 60 === 0) draw(); }
+    return { a: lastResult.a, b: lastResult.b, winner: lastResult.winner, cross };
+  });
+  check("対戦(AIチームが勝つ・壁を越えない)", v.winner === 1 && v.cross === 0, JSON.stringify(v));
+  // エンドレス: AI3人で、注文を逃し続けると終わる
+  const e = await p.evaluate(() => {
+    CKData.RECIPES.forEach(rc => { recipes[rc.name] = CKData.canonicalSteps(rc).map(s => ({ skill: s.skill, a: s.a })); });
+    startStage(ENDLESS[4], { humans: 1, ai: 3 }); introT = 0; players.filter(q => q.ai).forEach(q => runCmd(q, { cmd: "auto" }));
+    let n = 0; while (state === "play" && n < 80000) { update(0.05); n++; if (n % 60 === 0) draw(); }
+    return { state, time: lastResult && lastResult.time, score: lastResult && lastResult.score };
+  });
+  check("エンドレス(最後は終わる)", e.state === "result" && e.time > 10, JSON.stringify(e));
   check("結果画面", await p.evaluate(() => $("scr-result").style.display !== "none"));
   check("ブラウザのエラーなし", errs.length === 0, errs.slice(0, 3).join(" | "));
   await b.close();

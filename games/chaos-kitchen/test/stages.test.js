@@ -78,3 +78,26 @@ test("全レシピのお手本手順が作れて、提供で終わる", () => {
     }
   }
 });
+
+test("対戦・エンドレスのアリーナが構造検査を通る", () => {
+  assert.ok(S.ENDLESS.length >= 5 && S.VS_STAGES.length >= 5);
+  for (const st of [...S.ENDLESS, ...S.VS_STAGES]) assert.deepEqual(S.validate(st), [], `${st.id} ${st.name}`);
+});
+
+test("対戦は左右が鏡写しで、2つの部屋が壁で完全に分かれている", () => {
+  const flip = row => [...row].reverse().map(c => (c === "→" ? "←" : c === "←" ? "→" : c)).join("");
+  for (const st of S.VS_STAGES) {
+    const w = st.map[0].length / 2;
+    st.map.forEach(row => assert.equal(row.slice(w), flip(row.slice(0, w)), `${st.name}`));
+    assert.equal(S.floodRegions(st.map.map(r => [...r])).n, 2);
+    assert.equal(st.spawns.length, 4);
+    assert.ok(st.spawns[0][0] < w && st.spawns[1][0] < w && st.spawns[2][0] > w && st.spawns[3][0] > w);   // 出現位置も左右に2つずつ
+  }
+});
+
+test("エンドレスの料理は、後ろへいくほど難しい(材料が増える)", () => {
+  for (const st of S.ENDLESS) {
+    const sizes = st.menu.map(n => D.RECIPE_BY_NAME[n].need.length);
+    assert.ok(Math.max(...sizes.slice(-2)) >= Math.max(...sizes.slice(0, 2)), st.name);
+  }
+});

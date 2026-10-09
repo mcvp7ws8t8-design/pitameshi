@@ -382,6 +382,50 @@
     return stage;
   }
 
+  // ---- 対戦・エンドレス用のアリーナ(通常ステージとは別枠) ----
+  const mirrorRow = row => [...row].reverse().map(ch => ch === "→" ? "←" : ch === "←" ? "→" : ch);
+  function buildArena(a) {
+    const r = rng(a.id * 2654435761 + 777);
+    const menu = a.menu.map(n => D.RECIPE_BY_NAME[n]); if (menu.some(x => !x)) throw new Error("料理がない: " + a.menu);
+    const rq = D.requirements(menu);
+    const spec = { mode: "kitchen", shape: a.shape, w: a.w, h: a.h, tables: 0, split: 0, crates: rq.crates.map(t => D.ING[t].crate), boards: Math.max(3, rq.boards + 2), cooks: { S: 0, F: 0, V: 0 } };
+    for (const k of ["S", "F", "V"]) spec.cooks[k] = rq.cooks[k] ? Math.max(rq.cooks[k], 2) : 0;
+    const built = buildKitchen(spec, r), g = built.g;
+    decorate(g, r, { ice: a.ice || 0, belt: a.belt || 0, hallX: null });
+    let rows = g.map(row => row.join("")), spawns = pickSpawns(g, r, null, null);
+    if (a.versus) {                                     // 同じ厨房を左右に並べる(壁は2枚重ねで、向こう側には届かない)
+      const gw = rows[0].length;
+      rows = rows.map(row => row + mirrorRow(row).join(""));
+      spawns = [spawns[0], spawns[1], [2 * gw - spawns[0][0], spawns[0][1]], [2 * gw - spawns[1][0], spawns[1][1]]];
+    }
+    const map = rows, flat = map.join("");
+    const st = {
+      id: a.id, world: a.world, k: 0, name: a.name, worldName: a.kind, emoji: a.emoji, label: a.label || "", flavor: a.kind,
+      mode: "kitchen", map, hallX: null, menu: a.menu, tables: 0, time: a.time || 120, spawn: a.spawn || 18, patience: a.patience || 60,
+      events: a.events || [], evGap: a.evGap || 30, plates: 6, stock: a.stock || null, burn: a.burn || 1, minPlayers: 1, split: 0,
+      ice: flat.includes("~"), belt: /[→←↑↓]/.test(flat), tip: a.tip || "", req: { boards: spec.boards, cooks: spec.cooks, crates: rq.crates }, spawns,
+      versus: !!a.versus, endless: !!a.endless, desc: a.desc || "",
+    };
+    st.gimmicks = [st.ice ? "🧊氷" : "", st.belt ? "➡ベルト" : "", st.stock ? "📦在庫" : "", "🍳厨房"].filter(Boolean);
+    return st;
+  }
+  const ENDLESS_DEFS = [
+    { id: 201, name: "サラダ工房", emoji: "🥗", world: 1, shape: "box", w: 11, h: 8, menu: ["きざみレタス", "サラダ", "トマトスープ", "ミックスサラダ", "玉ねぎスープ", "野菜スープ"], desc: "やさしい練習向け。野菜と簡単なスープ。" },
+    { id: 202, name: "スープの街", emoji: "🍲", world: 2, shape: "L", w: 12, h: 8, menu: ["トマトスープ", "玉ねぎスープ", "にんじんスープ", "野菜スープ", "ミックスサラダ", "ポトフ"], desc: "コンロの取り合い。煮込みが主役。" },
+    { id: 203, name: "ステーキハウス", emoji: "🥩", world: 4, shape: "islands", w: 12, h: 8, menu: ["ステーキ", "サラダ", "ステーキプレート", "きのこソテー", "肉野菜炒め", "ミックスサラダ"], desc: "お肉と付け合わせ。焦がさずさばこう。" },
+    { id: 204, name: "バーガー&ポテト", emoji: "🍔", world: 6, shape: "ring", w: 12, h: 9, belt: 1, menu: ["ベジバーガー", "ハンバーガー", "フライドポテト", "チーズバーガー", "バーガーセット", "フィッシュ&チップス"], desc: "ベルトコンベア付き。揚げ物も登場。" },
+    { id: 205, name: "グランシェフ", emoji: "👨‍🍳", world: 10, shape: "cross", w: 13, h: 9, ice: 1, menu: ["サラダ", "ステーキ", "ハンバーガー", "ポテトグラタン", "フルコース", "海鮮グラタン", "肉丼"], desc: "氷の床。全部のせの上級者向け。" },
+  ].map(d => ({ ...d, kind: "エンドレス", endless: true, time: 99999, spawn: 20, patience: 70, events: [] }));
+  const VERSUS_DEFS = [
+    { id: 301, name: "サラダ対決", emoji: "🥗", world: 1, shape: "box", w: 8, h: 7, menu: ["サラダ", "きざみレタス", "トマトスープ"], desc: "入門。まずは操作に慣れよう。" },
+    { id: 302, name: "スープ対決", emoji: "🍲", world: 2, shape: "box", w: 8, h: 8, menu: ["トマトスープ", "玉ねぎスープ", "野菜スープ", "サラダ"], desc: "コンロの使い方が勝負。" },
+    { id: 303, name: "ステーキ対決", emoji: "🥩", world: 4, shape: "L", w: 9, h: 8, menu: ["ステーキ", "ステーキプレート", "サラダ", "きのこソテー"], desc: "お肉を焦がしたら負け。" },
+    { id: 304, name: "バーガー対決", emoji: "🍔", world: 6, shape: "box", w: 9, h: 8, belt: 1, menu: ["ベジバーガー", "ハンバーガー", "チーズバーガー", "サラダ"], desc: "ベルトコンベアに流されるな。" },
+    { id: 305, name: "揚げ物対決", emoji: "🍟", world: 7, shape: "box", w: 9, h: 8, menu: ["フライドポテト", "フィッシュフライ", "フィッシュ&チップス", "ハンバーガー"], desc: "油は焦げやすい。手早く!" },
+    { id: 306, name: "氷上対決", emoji: "🧊", world: 8, shape: "box", w: 9, h: 8, ice: 1, menu: ["焼きポテト", "チーズトースト", "ポテトグラタン", "サラダ"], desc: "滑る床で、止まれない!" },
+  ].map(d => ({ ...d, kind: "対戦", versus: true, time: 120, spawn: 14, patience: 50, events: [] }));
+  const ENDLESS = ENDLESS_DEFS.map(buildArena), VS_STAGES = VERSUS_DEFS.map(buildArena);
+
   const STAGES = [];
   for (let w = 0; w < WORLDS.length; w++) for (let k = 0; k < 10; k++) STAGES.push(buildStage(w, k));
 
@@ -391,7 +435,8 @@
     if (!rows.every(r => [...r].length === W)) errs.push("行の長さがそろっていない");
     const g = rows.map(r => [...r]);
     const cnt = {}; g.flat().forEach(c => { cnt[c] = (cnt[c] || 0) + 1; });
-    const need = (ch, n, label) => { if ((cnt[ch] || 0) < n) errs.push(`${label}が足りない(${cnt[ch] || 0}/${n})`); };
+    const mult = st.versus ? 2 : 1;
+    const need = (ch, n, label) => { n *= mult; if ((cnt[ch] || 0) < n) errs.push(`${label}が足りない(${cnt[ch] || 0}/${n})`); };
     need("P", 1, "お皿置き場"); need("X", 1, "ゴミ箱"); need("C", st.req.boards, "まな板");
     for (const k of ["S", "F", "V"]) if (st.req.cooks[k]) need(k, st.req.cooks[k], D.COOKERS[k].name);
     st.req.crates.forEach(t => need(D.ING[t].crate, 1, D.ING[t].name + "の置き場"));
@@ -399,7 +444,7 @@
     if (st.split) need("K", st.split - 1, "受け渡し台");
     // 床のつながり
     const { seen, n } = floodRegions(g);
-    const want = st.split || 1; if (n !== want) errs.push(`部屋の数が${n}(期待${want})`);
+    const want = st.versus ? 2 : (st.split || 1); if (n !== want) errs.push(`部屋の数が${n}(期待${want})`);
     // 設備はどれも床に面している
     g.forEach((row, y) => row.forEach((ch, x) => {
       if (isWalk(ch) || ch === "#") return;
@@ -420,5 +465,5 @@
     return errs;
   }
 
-  globalThis.CKStages = { STAGES, WORLDS, FLAVORS, validate, floodRegions, WALK, rng };
+  globalThis.CKStages = { STAGES, ENDLESS, VS_STAGES, WORLDS, FLAVORS, validate, floodRegions, WALK, rng };
 })();

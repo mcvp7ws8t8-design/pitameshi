@@ -111,6 +111,11 @@
   .confetti{position:fixed;top:-20px;width:10px;height:16px;border-radius:2px;animation:fall linear forwards;z-index:45;pointer-events:none}
   @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
   .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  #arList{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;width:100%}
+  #arList button{border:4px solid var(--ink);border-radius:18px;background:#fff;color:var(--ink);padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:800;box-shadow:0 5px 0 rgba(0,0,0,.35)}
+  #arList button span{font-size:28px}#arList button.sel{background:var(--wc);outline:4px solid #fff;outline-offset:1px;transform:translateY(-3px)}
+  #arInfo h3{margin:0 0 6px;font-family:var(--pop);font-weight:400;font-size:21px}
+  .vsr{font-family:var(--pop);font-size:56px;-webkit-text-stroke:6px var(--ink)}
   .sech{font-family:var(--pop);font-weight:400;font-size:28px;margin:0;-webkit-text-stroke:6px var(--ink);paint-order:stroke fill}
   .help h3{margin:10px 0 2px;font-family:var(--pop);font-weight:400;font-size:17px;color:var(--tomato)}
   .help p{margin:4px 0;font-weight:800;font-size:14px;line-height:1.6}
@@ -151,8 +156,21 @@
     <div class="pill" id="homeStars"></div>
     <button class="big go" id="homeContinue">つづきから</button>
     <button class="big sub" id="homeStart">ステージを選ぶ</button>
+    <div class="row"><button class="big sub" id="homeVs" style="min-width:0;flex:1 1 150px">⚔ 対戦モード</button><button class="big sub" id="homeEndless" style="min-width:0;flex:1 1 150px">♾ エンドレス</button></div>
     <div class="row"><button class="big sub small" id="homeHelp">❓ あそびかた</button><button class="big sub small" id="homeSettings">⚙ せってい</button></div>
     <div class="ver">Beta 0.9</div>
+  </div>
+  <div class="scr" id="scr-arena">
+    <div class="head"><button class="big sub small" id="arBack">← もどる</button><h2 id="arTitle"></h2></div>
+    <div id="arList"></div>
+    <div id="arInfo" class="card"></div>
+    <div class="card" id="arSetup">
+      <div class="setrow" id="arRowSize"><b>⚔ 形式</b><div id="arSize" class="seg"></div></div>
+      <div class="setrow"><b>👨‍🍳 人間</b><div id="arHumans" class="seg"></div></div>
+      <div class="setrow" id="arRowAi"><b>🤖 AI</b><div id="arAi" class="seg"></div></div>
+      <div id="arDev" class="dev"></div>
+    </div>
+    <button class="big go" id="arGo">スタート!</button>
   </div>
   <div class="scr" id="scr-help">
     <h2 class="sech">❓ あそびかた</h2>

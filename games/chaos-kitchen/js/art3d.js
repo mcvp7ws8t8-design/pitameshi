@@ -92,7 +92,7 @@ function counter3(g, x, z, top = P3.woodTop) {
 }
 function buildStatic(c, x, y, g) {
   const px = x + 0.5, pz = y + 0.5, t = c.t, hall = stage.hallX !== null && x >= stage.hallX;
-  const floorCol = () => (t === "~" ? ((x + y) & 1 ? P3.iceA : P3.iceB) : hall ? ((x + y) & 1 ? P3.hallA : P3.hallB) : ((x + y) & 1 ? P3.floorA : P3.floorB));
+  const floorCol = () => (stage.versus && t !== "~" ? (x < W / 2 ? ((x + y) & 1 ? "#ffd9d4" : "#ffc4bc") : ((x + y) & 1 ? "#d6e6ff" : "#bdd6ff")) : t === "~" ? ((x + y) & 1 ? P3.iceA : P3.iceB) : hall ? ((x + y) & 1 ? P3.hallA : P3.hallB) : ((x + y) & 1 ? P3.floorA : P3.floorB));
   if (t === "." || t === "~" || t === "B") {
     box(0.985, 0.12, 0.985, floorCol(), px, -0.06, pz, g, { cast: false });
     if (t === "~") box(0.985, 0.02, 0.985, "#ffffff", px, 0.005, pz, g, { m: { transparent: true, opacity: 0.4 }, cast: false });
@@ -253,7 +253,7 @@ function dynSig(c) {
   const t = c.t;
   if (isCooker(t)) return `${c.stove}|${c.sitem ? c.sitem.type : ""}|${c.res}`;
   if (t === "B") return `${c.tb.state}|${c.tb.who}`;
-  if (t === "P") return String(plates);
+  if (t === "P") return String(platesOf(c));
   if (t === "Z") return String(c.dirty);
   return itemSig(c.item);
 }
@@ -275,7 +275,7 @@ function buildDyn(c, g) {
     return;
   }
   if (t === "P") {
-    const n = Math.min(plates, 7);
+    const n = Math.min(platesOf(c), 7);
     for (let i = 0; i < n; i++) { cyl(0.32, 0.04, "#ffffff", 0, 0.03 + i * 0.05, 0, g); cyl(0.2, 0.045, "#dfe9ff", 0, 0.035 + i * 0.05, 0, g, { cast: false }); }
     return;
   }
@@ -434,7 +434,7 @@ function drawOverlay3D(tnow) {
       else if (c.stove === "done") bar3(x, y, Math.min(1, (c.prog - c.need) / (14 / stage.burn)), PAL.sun, true);
     } else if (t === "C" && c.prog > 0 && c.item) bar3(x, y, c.prog / chopTime, PAL.mint);
     else if (t === "Z") { if (c.dirty) pill3(`🍽×${c.dirty}`, x + 0.5, y + 1.0, 0.95, "#fff", PAL.ink, 13); if (c.prog > 0 && c.dirty) bar3(x, y, c.prog / washTime, PAL.sky, false, 0.8); }
-    else if (t === "P") pill3(`×${plates}`, x + 0.5, y + 1.0, 0.95, "#fff", plates ? PAL.ink : PAL.tomato, 14);
+    else if (t === "P") pill3(`×${platesOf(c)}`, x + 0.5, y + 1.0, 0.95, "#fff", platesOf(c) ? PAL.ink : PAL.tomato, 14);
     else if (CRATE[t] && c.stock !== null) pill3(`×${c.stock}`, x + 0.5, y + 1.0, 0.95, c.stock ? "#fff" : "#ffd9d9", c.stock ? PAL.ink : PAL.tomato, 13);
     else if (t === "B") {
       const tb = c.tb, k = Math.max(0.7, Math.min(1.4, ppt(x, y, 0.7) / 64));
