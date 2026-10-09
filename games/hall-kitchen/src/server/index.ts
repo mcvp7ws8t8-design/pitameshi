@@ -4,6 +4,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
+import { Game } from "../shared/game";
 import { RoomState, type Player } from "../shared/room";
 
 interface Env {
@@ -27,6 +28,10 @@ export default {
 
 export class Room extends DurableObject<Env> {
   private state = new RoomState();
+  private game = new Game(Date.now());
+  // ゲーム中だけ動かす。動いている間は Durable Object が眠らないので、終わったら止める
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private lastTick = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -34,6 +39,7 @@ export class Room extends DurableObject<Env> {
       const p = ws.deserializeAttachment() as Player | null;
       if (p) this.state.players.set(p.id, p);
     }
+    this.syncGame();
   }
 
   async fetch(_request: Request): Promise<Response> {
@@ -50,6 +56,7 @@ export class Room extends DurableObject<Env> {
     this.save(server, id);
     server.send(JSON.stringify({ t: "welcome", id } satisfies ServerMessage));
     this.broadcast();
+    this.syncGame();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -69,8 +76,22 @@ export class Room extends DurableObject<Env> {
       if (this.state.setRole(me.id, msg.role) === "role-taken") {
         return this.send(ws, { t: "error", reason: "role-taken" });
       }
+      this.save(ws, me.id);
+      this.broadcast();
+      return this.syncGame();
     } else if (msg.t === "input") {
       this.state.input(me.id, msg.mx, msg.mz, msg.yaw, Date.now());
+    } else if (msg.t === "act") {
+      const p = this.state.players.get(me.id);
+      const text = p?.role ? this.game.act(p.role, p.x, p.z) : "";
+      if (text) this.send(ws, { t: "info", text });
+      return this.broadcastGame();
+    } else if (msg.t === "next") {
+      this.game.cycle();
+      return this.broadcastGame();
+    } else if (msg.t === "restart") {
+      this.game.restart(this.bothReady());
+      return this.syncGame();
     } else {
       return this.send(ws, { t: "error", reason: "bad-message" });
     }
@@ -83,10 +104,53 @@ export class Room extends DurableObject<Env> {
     if (me) this.state.leave(me.id);
     ws.close();
     this.broadcast();
+    this.syncGame();
   }
 
   webSocketError(ws: WebSocket): void {
     this.webSocketClose(ws);
+  }
+
+  private bothReady(): boolean {
+    const roles = new Set([...this.state.players.values()].map((p) => p.role));
+    return roles.has("hall") && roles.has("kitchen");
+  }
+
+  /** 人の出入りや役割の変更を、ゲームの進行と時計に反映する */
+  private syncGame(): void {
+    this.game.update(this.bothReady());
+    this.syncTimer();
+    this.broadcastGame();
+  }
+
+  private syncTimer(): void {
+    const running = this.game.phase === "countdown" || this.game.phase === "playing";
+    if (running && !this.timer) {
+      this.lastTick = Date.now();
+      this.timer = setInterval(() => this.onTick(), 200);
+    } else if (!running && this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private onTick(): void {
+    const now = Date.now();
+    this.game.tick(Math.min(0.5, (now - this.lastTick) / 1000));
+    this.lastTick = now;
+    this.syncTimer();
+    this.broadcastGame();
+  }
+
+  private broadcastGame(): void {
+    const data = JSON.stringify({ t: "game", g: this.game.snapshot() } satisfies ServerMessage);
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(data);
+      } catch {
+        // 切れかけの接続は close イベントで片付く
+      }
+    }
   }
 
   private save(ws: WebSocket, id: string): void {

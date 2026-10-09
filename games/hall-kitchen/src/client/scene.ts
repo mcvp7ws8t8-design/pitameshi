@@ -46,9 +46,9 @@ export function buildRestaurant(): THREE.Scene {
   }
 
   // キッチンの設備(奥の壁沿い)
-  scene.add(box(2, 0.9, 1, 0x444a50, -6, 0.45, -8.8)); // コンロ
-  scene.add(box(2, 0.9, 1, 0x9aa3ab, -3, 0.45, -8.8)); // 作業台
-  scene.add(box(2, 0.9, 1, 0x7fb4d6, 0, 0.45, -8.8)); // 洗い場
+  scene.add(box(2, 0.9, 1, 0x444a50, -6, 0.45, -8.8)); // コンロ1
+  scene.add(box(2, 0.9, 1, 0x444a50, -3, 0.45, -8.8)); // コンロ2
+  scene.add(box(2, 0.9, 1, 0x7fb4d6, 0, 0.45, -8.8)); // 洗い場(まだ使わない)
   scene.add(box(2, 1.8, 1, 0xcfd6dc, 4, 0.9, -8.8)); // 冷蔵庫
   scene.add(box(1.6, 0.9, 1.6, 0x9aa3ab, 0, 0.45, -5)); // 中央の作業台
   return scene;

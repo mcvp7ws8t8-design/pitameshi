@@ -17,6 +17,16 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     #msg { min-height: 1.4em; font-size: 14px; color: #ffd8a8; }
     #hud { position: fixed; left: 12px; top: 12px; font-size: 14px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+    #top { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 14px; font-weight: 700; font-size: 16px; text-shadow: 0 1px 3px #000; pointer-events: none; white-space: nowrap; }
+    #side { position: fixed; right: 12px; top: 44px; width: 220px; font-size: 14px; line-height: 1.5; background: #0007; padding: 8px 10px; border-radius: 8px; pointer-events: none; }
+    #prompt { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); font-size: 18px; font-weight: 700; text-shadow: 0 1px 3px #000; pointer-events: none; }
+    #info { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); font-size: 16px; color: #ffd8a8; text-shadow: 0 1px 3px #000; pointer-events: none; }
+    #center { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; text-shadow: 0 2px 6px #000; }
+    #center { pointer-events: none; }
+    #center button { font-size: 18px; padding: 12px 24px; pointer-events: auto; }
+    #center[hidden], #side[hidden], #top[hidden] { display: none; }
+    .sel { color: #ffd43b; }
+    .dim { opacity: .65; }
     #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #fff8; pointer-events: none; }
   </style>
 </head>
@@ -40,6 +50,11 @@
   </div>
   <div id="hud" hidden></div>
   <div id="cross" hidden></div>
+  <div id="top" hidden></div>
+  <div id="side" hidden></div>
+  <div id="prompt"></div>
+  <div id="info"></div>
+  <div id="center" hidden></div>
   <script type="module" src="/src/client/main.ts"></script>
 </body>
 </html>

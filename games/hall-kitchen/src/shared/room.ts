@@ -27,9 +27,10 @@ export const BOUNDS: Record<Role, { minX: number; maxX: number; minZ: number; ma
 };
 
 // 入ったときの位置と向き。three.js のカメラは yaw=0 で -z を向く。
+// ホールは入口側(z=6)からテーブルとカウンター(-z)を、キッチンはコンロのある奥の壁(-z)を向いて始まる。
 export const SPAWN: Record<Role, { x: number; z: number; yaw: number }> = {
   hall: { x: 0, z: 6, yaw: 0 },
-  kitchen: { x: 0, z: -5, yaw: Math.PI },
+  kitchen: { x: 0, z: -5, yaw: 0 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

@@ -1,7 +1,10 @@
 import * as THREE from "three";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
+import { DISHES, type GameSnapshot } from "../shared/game";
+import { nearestTarget } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { buildAvatar, buildRestaurant } from "./scene";
+import { GameView } from "./view";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ROLE_NAME: Record<Role, string> = { hall: "ホール", kitchen: "キッチン" };
@@ -9,6 +12,9 @@ const ROLE_NAME: Record<Role, string> = { hall: "ホール", kitchen: "キッチ
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 document.body.prepend(renderer.domElement);
 const scene = buildRestaurant();
+const view = new GameView(scene);
+let game: GameSnapshot | null = null;
+let infoTimer = 0;
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 100);
 camera.rotation.order = "YXZ";
 const EYE = 1.6;
@@ -49,7 +55,9 @@ function connect(code: string) {
   ws.onclose = () => {
     myRole = null;
     $("ui").classList.remove("hidden");
-    $("hud").hidden = $("cross").hidden = true;
+    for (const id of ["hud", "cross", "top", "side", "center"]) $(id).hidden = true;
+    $("prompt").textContent = "";
+    game = null;
     $("step1").hidden = false;
     $("step2").hidden = true;
     say("接続が切れました");
@@ -57,7 +65,12 @@ function connect(code: string) {
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data as string) as ServerMessage;
     if (msg.t === "welcome") myId = msg.id;
-    else if (msg.t === "error") {
+    else if (msg.t === "game") onGame(msg.g);
+    else if (msg.t === "info") {
+      $("info").textContent = msg.text;
+      clearTimeout(infoTimer);
+      infoTimer = window.setTimeout(() => ($("info").textContent = ""), 2500);
+    } else if (msg.t === "error") {
       say({ full: "この部屋は満員です", "role-taken": "その役割は選ばれています", "bad-message": "通信エラー" }[msg.reason]);
     } else onState(msg.players);
   };
@@ -70,7 +83,7 @@ function onState(list: PlayerSnapshot[]) {
     myRole = mine.role;
     Object.assign(me, { x: mine.x, z: mine.z, yaw: mine.yaw, pitch: 0 });
     $("ui").classList.add("hidden");
-    $("hud").hidden = $("cross").hidden = false;
+    $("hud").hidden = $("cross").hidden = $("top").hidden = $("side").hidden = false;
   } else if (mine?.role) {
     // 自分の位置は手元の予測を優先し、ずれが大きいときだけサーバーに合わせる
     const err = Math.hypot(mine.x - me.x, mine.z - me.z);
@@ -106,9 +119,94 @@ function onState(list: PlayerSnapshot[]) {
     : "";
 }
 
+// ---- ゲームの表示 ----
+const dishName = (d: keyof typeof DISHES) => DISHES[d].name;
+
+function onGame(g: GameSnapshot) {
+  const prevPhase = game?.phase;
+  game = g;
+  view.update(g);
+  if (g.phase === "over" && prevPhase !== "over") document.exitPointerLock();
+  $("top").textContent = "";
+  const top = [`残り ${Math.floor(g.timeLeft / 60)}:${String(g.timeLeft % 60).padStart(2, "0")}`, `さばいた ${g.served}`, `怒って帰った ${g.angry}/${g.maxAngry}`, `行列 ${g.queue}人`];
+  $("top").replaceChildren(...top.map((t) => Object.assign(document.createElement("span"), { textContent: t })));
+  renderSide(g);
+  renderCenter(g);
+}
+
+function renderSide(g: GameSnapshot) {
+  const lines: string[] = [];
+  const mine = g.tickets;
+  if (myRole === "kitchen") {
+    const news = mine.filter((t) => t.status === "new");
+    lines.push(`<b>注文(${news.length})</b>  <span class="dim">[R]で切り替え</span>`);
+    for (const t of news.slice(0, 8)) {
+      lines.push(`<span class="${t.id === g.selected ? "sel" : ""}">${t.id === g.selected ? "▶ " : ""}席${t.seat + 1} ${dishName(t.dish)}</span>`);
+    }
+    if (news.length > 8) lines.push(`<span class="dim">…ほか${news.length - 8}件</span>`);
+    g.stoves.forEach((id, i) => {
+      const t = id === null ? undefined : mine.find((x) => x.id === id);
+      lines.push(`コンロ${i + 1}: ${t ? `席${t.seat + 1} ${dishName(t.dish)} ${t.status === "ready" ? "✔できた" : "調理中"}` : "空き"}`);
+    });
+    const held = mine.filter((t) => t.status === "kitchen");
+    lines.push(`持っている: ${held.map((t) => `席${t.seat + 1} ${dishName(t.dish)}`).join("、") || "なし"}`);
+  } else {
+    const held = mine.filter((t) => t.status === "hall");
+    lines.push(`<b>トレー(${held.length}/3)</b>`);
+    for (const t of held) lines.push(`席${t.seat + 1} ${dishName(t.dish)}`);
+    lines.push(`受け渡し台: ${mine.filter((t) => t.status === "pass").length}つ`);
+    lines.push(`調理待ち: ${mine.filter((t) => t.status === "new" || t.status === "cooking").length}件`);
+  }
+  $("side").innerHTML = lines.join("<br>");
+}
+
+function renderCenter(g: GameSnapshot) {
+  const c = $("center");
+  c.hidden = g.phase === "playing";
+  if (g.phase === "waiting") c.textContent = "相手を待っています…";
+  else if (g.phase === "countdown") c.textContent = String(g.countdown);
+  else if (g.phase === "over") {
+    const reason = g.angry >= g.maxAngry ? "お客さんが怒って帰りました" : "閉店です";
+    const btn = Object.assign(document.createElement("button"), { textContent: "もう一度 (Enter)", onclick: () => send({ t: "restart" }) });
+    c.replaceChildren(`${reason}`, `さばいた数: ${g.served}`, btn);
+  }
+}
+
+function promptText(): string {
+  if (!game || game.phase !== "playing" || !myRole) return "";
+  const target = nearestTarget(myRole, me.x, me.z);
+  if (!target) return "";
+  const tickets = game.tickets;
+  if (target.kind === "seat") {
+    const s = game.seats[target.i];
+    if (!s) return "";
+    if (s.s === "waitOrder") return `[E] 席${target.i + 1}の注文を取る`;
+    if (s.s === "waitFood") {
+      const t = tickets.find((x) => x.seat === target.i && x.status === "hall");
+      return t ? `[E] ${dishName(t.dish)}を出す` : "料理待ち";
+    }
+    return "食事中";
+  }
+  if (target.kind === "stove") {
+    const id = game.stoves[target.i];
+    const t = id === null || id === undefined ? undefined : tickets.find((x) => x.id === id);
+    if (t) return t.status === "ready" ? `[E] ${dishName(t.dish)}を取る` : "調理中";
+    const sel = tickets.find((x) => x.id === game!.selected);
+    return sel ? `[E] 席${sel.seat + 1}の${dishName(sel.dish)}を作る` : "注文がありません";
+  }
+  if (myRole === "hall") return tickets.some((t) => t.status === "pass") ? "[E] 受け渡し台から料理を取る" : "";
+  return tickets.some((t) => t.status === "kitchen") ? "[E] 料理を受け渡し台に置く" : "";
+}
+
 // ---- 操作 ----
 const keys = new Set<string>();
-addEventListener("keydown", (e) => keys.add(e.code));
+addEventListener("keydown", (e) => {
+  keys.add(e.code);
+  if (e.repeat) return;
+  if (e.code === "KeyE") send({ t: "act" });
+  else if (e.code === "KeyR") send({ t: "next" });
+  else if (e.code === "Enter" && game?.phase === "over") send({ t: "restart" });
+});
 addEventListener("keyup", (e) => keys.delete(e.code));
 addEventListener("blur", () => keys.clear());
 renderer.domElement.addEventListener("click", () => {
@@ -141,6 +239,7 @@ renderer.setAnimationLoop((now) => {
     const { mx, mz } = axes();
     Object.assign(me, step(me, myRole, mx, mz, me.yaw, dt));
   }
+  if (myRole) $("prompt").textContent = promptText();
   camera.position.set(me.x, EYE, me.z);
   camera.rotation.set(me.pitch, me.yaw, 0);
   renderer.render(scene, camera);
