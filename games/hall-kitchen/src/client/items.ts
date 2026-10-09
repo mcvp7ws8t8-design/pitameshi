@@ -133,24 +133,24 @@ const ING_MODEL: Record<number, ModelSpec> = {
 type DrinkSpec = [model: FoodModel, size: number, tint?: Tint];
 const DRINK_MODEL: DrinkSpec[] = [
   ["glass", 0.13], // お冷
-  ["cup-tea", 0.1, [0x8a5a2b, 0.35]], // 烏龍茶
-  ["cup-thea", 0.1, [0x8aa84a, 0.35]], // 緑茶
+  ["cup-tea", 0.1, [0x8a5a2b, 0.6]], // 烏龍茶
+  ["cup-thea", 0.1, [0x6f9a3a, 0.65]], // 緑茶
   ["soda-bottle", 0.18], // コーラ
-  ["soda", 0.15, [0xd9a441, 0.45]], // ジンジャーエール
-  ["soda-glass", 0.14, [0xf08a1a, 0.5]], // オレンジジュース
-  ["soda-glass", 0.14, [0xe6c75a, 0.5]], // アップルジュース
-  ["soda", 0.15, [0x5a3a22, 0.55]], // アイスコーヒー
+  ["soda", 0.15, [0xd9a441, 0.8]], // ジンジャーエール
+  ["soda-glass", 0.14, [0xf08a1a, 0.85]], // オレンジジュース
+  ["soda-glass", 0.14, [0xd9c24a, 0.8]], // アップルジュース
+  ["soda", 0.15, [0x5a3a22, 0.85]], // アイスコーヒー
   ["cup", 0.1], // ホットコーヒー
-  ["soda", 0.15, [0xb86a24, 0.5]], // アイスティー
+  ["soda", 0.15, [0xb86a24, 0.8]], // アイスティー
   ["cup-tea", 0.1], // ホットティー
-  ["soda-glass", 0.14, [0xe8e060, 0.5]], // レモンスカッシュ
-  ["bottle", 0.18, [0xe9b43a, 0.6]], // 生ビール
-  ["glass", 0.13, [0xe8c860, 0.55]], // ハイボール
-  ["glass", 0.13, [0xc89a30, 0.6]], // 梅酒
-  ["cup", 0.1, [0xc8a078, 0.45]], // カフェラテ
+  ["soda-glass", 0.14, [0xe0e040, 0.8]], // レモンスカッシュ
+  ["bottle", 0.18, [0xe9a21a, 0.85]], // 生ビール
+  ["glass", 0.13, [0xe8c050, 0.75]], // ハイボール
+  ["glass", 0.13, [0xc88a20, 0.8]], // 梅酒
+  ["cup", 0.1, [0xc8946a, 0.7]], // カフェラテ
   ["mug-1", 0.11], // ココア
-  ["frappe", 0.15, [0xf0f0a0, 0.4]], // レモンサワー
-  ["glass-wine", 0.17, [0x8a1a2e, 0.55]], // ワイン
+  ["frappe", 0.15, [0xeaea70, 0.7]], // レモンサワー
+  ["glass-wine", 0.17, [0x8a1a2e, 0.85]], // ワイン
   ["egg-cup", 0.07], // 日本酒
 ];
 
@@ -427,3 +427,7 @@ export const dishColorCss = (i: number): string => hex(ING_LOOK[DISHES[i % DISHE
 export const ingredientColorCss = (i: number, cooked: boolean): string => hex(cooked ? ING_LOOK[i]!.cooked : ING_LOOK[i]!.raw);
 export const drinkColorCss = (i: number): string => hex(DRINK_LOOK[i % DRINK_LOOK.length]!.color);
 export const dishColorHex = (i: number): number => ING_LOOK[DISHES[i % DISHES.length]!.parts[0]! % ING_LOOK.length]!.cooked;
+
+/** 図鑑用: 食材・ドリンクの形が、配布モデルか、コードで作ったものか(モデルが読み込めているときの話) */
+export const ingredientHasModel = (i: number): boolean => ING_MODEL[i] !== undefined;
+export const drinkHasModel = (i: number): boolean => DRINK_MODEL[i % DRINK_MODEL.length] !== undefined;

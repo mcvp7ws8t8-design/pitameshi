@@ -8,7 +8,8 @@
     "test": "tsx --test src/shared/*.test.ts",
     "typecheck": "tsc -p tsconfig.shared.json && tsc -p tsconfig.server.json && tsc -p tsconfig.client.json",
     "deploy": "vite build && wrangler deploy",
-    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs"
+    "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
+    "build:gallery": "vite build -c vite.gallery.config.ts && node scripts/make-gallery.mjs"
   },
   "dependencies": {
     "three": "^0.170.0"
