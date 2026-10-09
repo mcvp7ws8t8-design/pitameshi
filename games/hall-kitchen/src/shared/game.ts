@@ -64,6 +64,9 @@ export interface TicketSnapshot {
   status: TicketStatus;
 }
 export interface SeatSnapshot {
+  id: number; // お客さんの番号(見た目を決めるのに使う)
+  dish: number;
+  drink: number;
   s: Exclude<CustomerState, "queue">;
   p: number; // 我慢の残り 0〜1
   d: 0 | 1 | 2; // ドリンク 0: まだ注文されていない / 1: 待っている / 2: 出した
@@ -391,7 +394,7 @@ export class Game {
     for (const c of this.customers) {
       if (c.state === "queue") continue;
       const d = c.state === "waitOrder" ? 0 : c.drinkDone ? 2 : 1;
-      seats[c.seat] = { s: c.state, p: c.state === "eating" ? 1 : Math.round((c.patience / c.max) * 100) / 100, d };
+      seats[c.seat] = { id: c.id, dish: c.dish, drink: c.drink, s: c.state, p: c.state === "eating" ? 1 : Math.round((c.patience / c.max) * 100) / 100, d };
     }
     return {
       phase: this.phase,

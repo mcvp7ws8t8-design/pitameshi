@@ -37,4 +37,11 @@ npm run deploy      # Cloudflare に公開(Durable Objects を使う)
 - `src/shared/layout.ts` 席・コンロ・受け渡し台の位置と、近くにあるものの判定
 - `src/shared/protocol.ts` 通信メッセージ
 - `src/server/index.ts` Worker と、1部屋 = 1つの Durable Object(WebSocket)
-- `src/client/` Three.js の画面と操作(`view.ts` がゲームの状態を3Dに映す)
+- `src/client/` Three.js の画面と操作。画像・3Dモデルのファイルは使わず、形と質感はすべてコードで作る
+  - `scene.ts` 店(床・壁・窓・家具・キッチン設備・照明・日光の影) / `textures.ts` Canvas で描く質感
+  - `people.ts` 人のモデル / `items.ts` 料理20種・ドリンク20種のモデル
+  - `view.ts` ゲームの状態を3Dに映す / `viewmodel.ts` 一人称の手元(トレー・皿)
+  - `main.ts` 通信・操作・画面の部品(HUD)
+
+## 見た目の確認
+URL に `?debug` を付けると、ブラウザのコンソールから `__debug.play(役割, x, z, yaw, 状態)` で、サーバーなしで任意のゲーム状態を表示できる(見た目の確認用。通常のプレイには影響しない)。
