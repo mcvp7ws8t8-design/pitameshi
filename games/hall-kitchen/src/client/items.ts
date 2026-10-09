@@ -334,3 +334,4 @@ const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
 export const dishColorCss = (i: number): string => hex(ING_LOOK[DISHES[i % DISHES.length]!.parts[0]! % ING_LOOK.length]!.cooked);
 export const ingredientColorCss = (i: number, cooked: boolean): string => hex(cooked ? ING_LOOK[i]!.cooked : ING_LOOK[i]!.raw);
 export const drinkColorCss = (i: number): string => hex(DRINK_LOOK[i % DRINK_LOOK.length]!.color);
+export const dishColorHex = (i: number): number => ING_LOOK[DISHES[i % DISHES.length]!.parts[0]! % ING_LOOK.length]!.cooked;

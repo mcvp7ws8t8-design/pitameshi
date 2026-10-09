@@ -6,6 +6,8 @@ import { partIndex, partTicket, type GameSnapshot } from "../shared/game";
 import { BARS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
 import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink, makeIngredient } from "./items";
+import { dishColorHex } from "./items";
+import type { Kitchen } from "./kitchen";
 import { applyLook, bakePerson, buildPerson, lookFor, type Person } from "./people";
 
 function bubbleTexture(draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -146,7 +148,7 @@ export class GameView {
   private barSlot: Slot[] = [];
   private passSlot: Slot[] = [];
 
-  constructor(scene: THREE.Scene, private burners: THREE.MeshStandardMaterial[][]) {
+  constructor(scene: THREE.Scene, private kitchen: Kitchen) {
     SEATS.forEach((s, i) => {
       const back = s.yaw === 0 ? 1 : -1; // 背もたれ側
       const person = buildPerson(lookFor(0), "customer", true);
@@ -252,6 +254,12 @@ export class GameView {
     this.queue.forEach((q, i) => (q.visible = i < g.queue));
 
     const byId = new Map(g.tickets.map((t) => [t.id, t]));
+    this.kitchen.rail.set(
+      g.tickets
+        .filter((t) => t.kind === "food" && t.status === "new")
+        .sort((a, b) => a.id - b.id)
+        .map((t, i) => ({ color: dishColorHex(t.item), late: i < 2 && g.tickets.length > 8 })),
+    );
     g.stoves.forEach((id, i) => {
       const part = id === null ? undefined : byId.get(partTicket(id))?.parts?.[partIndex(id)];
       const cooking = part?.st === "cooking";
@@ -275,7 +283,7 @@ export class GameView {
         }
         return g2;
       });
-      for (const m of this.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
+      for (const m of this.kitchen.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
     });
     g.bars.forEach((id, i) => {
       const t = id === null ? undefined : byId.get(id);

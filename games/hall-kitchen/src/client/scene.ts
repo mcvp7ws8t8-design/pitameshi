@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { BARS, SEATS, STOVES, TABLES, TABLE_SIZE } from "../shared/layout";
+import { buildKitchen, type Kitchen } from "./kitchen";
 import * as tex from "./textures";
 
 const H = 3.2; // 天井の高さ
@@ -50,8 +51,7 @@ function cylinder(rt: number, rb: number, h: number, m: THREE.Material, x: numbe
 
 export interface Restaurant {
   scene: THREE.Scene;
-  /** コンロごとのバーナーの材質。調理中に光らせる */
-  burners: THREE.MeshStandardMaterial[][];
+  kitchen: Kitchen;
 }
 
 export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
@@ -239,61 +239,14 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   scene.add(neon);
   void BARS;
 
-  // ---- キッチン: 調理場(位置は layout.ts の STOVES と同じ)・シンク・冷蔵庫・作業台 ----
-  // 焼く5(奥の壁)・揚げる2(奥の壁)・茹でる4(左の壁)。種類で見た目を変える。
-  const burners: THREE.MeshStandardMaterial[][] = [];
-  const glowMat = () => new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.4, metalness: 0.8, emissive: 0xff5a1a, emissiveIntensity: 0 });
-  for (const s of STOVES) {
-    const side = s.kind === "boil";
-    const w = side ? 1.4 : 1.8; // 壁に沿った長さ
-    const sx = side ? 1.0 : w;
-    const sz = side ? w : 1.0;
-    scene.add(box(sx, 0.9, sz, steelM(2, 1), s.x, 0.45, s.z, { round: 0.01 }));
-    scene.add(box(sx + 0.02, 0.04, sz + 0.02, plain(0x1b1b1d, 0.3, 0.7), s.x, 0.92, s.z));
-    const mats: THREE.MeshStandardMaterial[] = [];
-    if (s.kind === "grill") {
-      // 鉄板
-      const m = glowMat();
-      mats.push(m);
-      const plate = box(1.4, 0.03, 0.7, m, s.x, 0.95, s.z, { recv: false });
-      scene.add(plate);
-    } else if (s.kind === "boil") {
-      // 丸い鍋穴(水面)
-      const water = new THREE.MeshStandardMaterial({ color: 0x6fa8cf, roughness: 0.08, metalness: 0.1, emissive: 0x7ec8ff, emissiveIntensity: 0 });
-      mats.push(water);
-      const vat = cylinder(0.38, 0.38, 0.03, water, s.x, 0.95, s.z, 28);
-      scene.add(vat);
-      scene.add(cylinder(0.42, 0.42, 0.04, plain(0x888d94, 0.3, 0.9), s.x, 0.93, s.z, 28));
-    } else {
-      // 揚げ物の油槽
-      const oil = new THREE.MeshStandardMaterial({ color: 0xc88a1a, roughness: 0.15, emissive: 0xff5a1a, emissiveIntensity: 0 });
-      mats.push(oil);
-      scene.add(box(1.3, 0.03, 0.7, oil, s.x, 0.95, s.z, { recv: false }));
-      scene.add(box(1.4, 0.06, 0.8, plain(0x888d94, 0.3, 0.9), s.x, 0.93, s.z));
-    }
-    burners.push(mats);
-    // つまみ
-    for (let k = 0; k < 3; k++) {
-      const front = side ? [s.x + 0.52, s.z - 0.35 + k * 0.35] : [s.x - 0.5 + k * 0.5, s.z + 0.52];
-      scene.add(cylinder(0.03, 0.03, 0.03, plain(0x333333, 0.4, 0.6), front[0]!, 0.8, front[1]!, 10));
-    }
-  }
-  // 換気フード(奥の壁の調理場の上)
-  scene.add(box(13, 0.45, 1.3, steelM(6, 1), -2.5, 2.35, -9.2, { round: 0.02 }), box(1.0, 0.8, 1.0, steelM(1, 1), -2.5, 2.95, -9.2));
-  scene.add(box(2, 0.9, 1, steelM(2, 1), 8.5, 0.45, -8.8, { round: 0.01 })); // シンク台
-  scene.add(box(1.5, 0.05, 0.7, plain(0x9aa3ab, 0.25, 0.9), 8.5, 0.92, -8.8), cylinder(0.015, 0.015, 0.4, steelM(1, 1), 8.5, 1.15, -9.2, 8));
-  scene.add(box(0.03, 0.03, 0.25, steelM(1, 1), 8.5, 1.35, -9.07));
-  scene.add(box(2, 1.9, 1, steelM(2, 2), 6.2, 0.95, -8.8, { round: 0.02 })); // 冷蔵庫
-  scene.add(box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 5.45, 1.2, -8.25), box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 6.95, 1.2, -8.25));
-  scene.add(box(0.01, 1.8, 0.02, plain(0x555960, 0.5), 6.2, 0.95, -8.29));
-  // 右の壁沿いの作業台と棚
-  scene.add(box(1.0, 0.9, 4.8, steelM(2, 3), 9.4, 0.45, -5, { round: 0.01 }), box(1.04, 0.05, 4.84, steelM(3, 2), 9.4, 0.93, -5));
-  scene.add(box(0.4, 0.04, 4.8, wood(2, 1), 9.7, 1.9, -5), box(0.4, 0.04, 4.8, wood(2, 1), 9.7, 2.35, -5));
-  for (let k = 0; k < 7; k++) {
-    const z = -7.2 + k * 0.66;
-    const potM = plain([0xb8bdc4, 0x8a8f96, 0xc9a24a, 0x6a6e75][k % 4]!, 0.3, 0.9);
-    scene.add(cylinder(0.14, 0.12, 0.16, potM, 9.7, 2.0, z, 18), cylinder(0.12, 0.1, 0.14, potM, 9.7, 2.45, z, 18));
-  }
+  // ---- キッチンの設備(調理場・冷蔵庫・シンク・作業台・棚・伝票レール) ----
+  const kitchen = buildKitchen(scene, {
+    box,
+    cyl: (rt, rb, h, m, x, y, z, seg) => cylinder(rt, rb, h, m, x, y, z, seg),
+    plain,
+    steel: (w, h) => steelM(w, h),
+    wood: (w, h) => wood(w, h),
+  });
   // キッチンの天井灯
   for (const [x, z] of [[-5, -3.5], [3, -3.5], [-1, -7.5]] as const) {
     scene.add(box(1.2, 0.04, 0.5, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xe8f2ff, emissiveIntensity: 2.2 }), x, H - 0.02, z, { cast: false }));
@@ -322,5 +275,5 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   scene.add(sun, sun.target);
 
   scene.fog = new THREE.Fog(0x15110e, 25, 45);
-  return { scene, burners };
+  return { scene, kitchen };
 }

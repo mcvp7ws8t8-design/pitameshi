@@ -43,8 +43,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.autoClear = false;
 document.body.prepend(renderer.domElement);
 
-const { scene, burners } = buildRestaurant(renderer);
-const view = new GameView(scene, burners);
+const { scene, kitchen } = buildRestaurant(renderer);
+const view = new GameView(scene, kitchen);
 const hands = new ViewModel(scene.environment as THREE.Texture | null);
 const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 100);
 camera.rotation.order = "YXZ";
@@ -327,7 +327,10 @@ const keys = new Set<string>();
 addEventListener("keydown", (e) => {
   keys.add(e.code);
   if (e.repeat) return;
-  if (e.code === "KeyE") send({ t: "act" });
+  if (e.code === "KeyE") {
+    if (myRole === "kitchen" && nearestTarget("kitchen", me.x, me.z)?.kind === "fridge") kitchen.openFridge();
+    send({ t: "act" });
+  }
   else if (e.code === "KeyR") send({ t: "next" });
   else if (e.code === "Enter" && game?.phase === "over") send({ t: "restart" });
 });
@@ -392,6 +395,7 @@ renderer.setAnimationLoop((now) => {
   camera.position.set(me.x, EYE, me.z);
   camera.rotation.set(me.pitch, me.yaw, 0);
   camera.updateMatrixWorld();
+  kitchen.update(dt);
   hands.update(camera, now / 1000, speed);
   renderer.clear();
   renderer.render(scene, camera);
