@@ -2,9 +2,14 @@
 // 時間は秒。ドリンクの relief は、出したときにお客さんの我慢ゲージが戻る割合(0〜1)。
 // 手間のかかるものほど、効き目が大きい。
 
+// 料理は、焼く・茹でる・揚げるのどれか1つで作る。それぞれ専用の調理場がある。
+export type Method = "grill" | "boil" | "fry";
+export const METHOD_NAME: Record<Method, string> = { grill: "焼き", boil: "茹で", fry: "揚げ" };
+
 export interface DishInfo {
   name: string;
   cook: number;
+  method: Method;
 }
 export interface DrinkInfo {
   name: string;
@@ -12,27 +17,28 @@ export interface DrinkInfo {
   relief: number;
 }
 
+// 焼く 8種 / 茹でる 7種 / 揚げる 5種。順番は client/items.ts の見た目の表と同じ
 export const DISHES: DishInfo[] = [
-  { name: "冷やっこ", cook: 2 },
-  { name: "サラダ", cook: 3 },
-  { name: "コーンスープ", cook: 3 },
-  { name: "おにぎり", cook: 3 },
-  { name: "フライドポテト", cook: 4 },
-  { name: "サンドイッチ", cook: 4 },
-  { name: "から揚げ", cook: 5 },
-  { name: "餃子", cook: 5 },
-  { name: "焼き鳥", cook: 5 },
-  { name: "カレーライス", cook: 6 },
-  { name: "ナポリタン", cook: 6 },
-  { name: "チャーハン", cook: 6 },
-  { name: "ハンバーグ", cook: 7 },
-  { name: "オムライス", cook: 7 },
-  { name: "カルボナーラ", cook: 7 },
-  { name: "ラーメン", cook: 8 },
-  { name: "寿司盛り合わせ", cook: 8 },
-  { name: "とんかつ定食", cook: 9 },
-  { name: "天ぷら盛り合わせ", cook: 9 },
-  { name: "ステーキ", cook: 10 },
+  { name: "湯豆腐", cook: 2, method: "boil" },
+  { name: "温野菜サラダ", cook: 3, method: "boil" },
+  { name: "コーンスープ", cook: 3, method: "boil" },
+  { name: "焼きおにぎり", cook: 3, method: "grill" },
+  { name: "フライドポテト", cook: 4, method: "fry" },
+  { name: "ホットサンド", cook: 4, method: "grill" },
+  { name: "から揚げ", cook: 5, method: "fry" },
+  { name: "餃子", cook: 5, method: "grill" },
+  { name: "焼き鳥", cook: 5, method: "grill" },
+  { name: "カレーライス", cook: 6, method: "boil" },
+  { name: "ナポリタン", cook: 6, method: "boil" },
+  { name: "チャーハン", cook: 6, method: "grill" },
+  { name: "ハンバーグ", cook: 7, method: "grill" },
+  { name: "オムライス", cook: 7, method: "grill" },
+  { name: "カルボナーラ", cook: 7, method: "boil" },
+  { name: "ラーメン", cook: 8, method: "boil" },
+  { name: "エビフライ", cook: 8, method: "fry" },
+  { name: "とんかつ定食", cook: 9, method: "fry" },
+  { name: "天ぷら盛り合わせ", cook: 9, method: "fry" },
+  { name: "ステーキ", cook: 10, method: "grill" },
 ];
 
 export const DRINKS: DrinkInfo[] = [
@@ -58,5 +64,6 @@ export const DRINKS: DrinkInfo[] = [
   { name: "日本酒", make: 3, relief: 0.5 },
 ];
 
+export const methodOf = (i: number): Method => DISHES[i]?.method ?? "grill";
 export const dishName = (i: number): string => DISHES[i]?.name ?? "?";
 export const drinkName = (i: number): string => DRINKS[i]?.name ?? "?";

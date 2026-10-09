@@ -3,7 +3,8 @@
 
 import * as THREE from "three";
 import { type GameSnapshot } from "../shared/game";
-import { BARS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot } from "../shared/layout";
+import { BARS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
+import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink } from "./items";
 import { applyLook, bakePerson, buildPerson, lookFor, type Person } from "./people";
 
@@ -50,26 +51,28 @@ function sprite(color: number): THREE.Sprite {
   return s;
 }
 
-function numberSprite(n: number): THREE.Sprite {
+/** 丸い札に文字を入れた、常にこちらを向く看板 */
+function tagSprite(text: string, size: number, color = "#222"): THREE.Sprite {
   const c = document.createElement("canvas");
-  c.width = c.height = 64;
+  c.width = 128;
+  c.height = 64;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#222";
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(32, 32, 30, 0, Math.PI * 2);
+  ctx.roundRect(4, 4, 120, 56, 28);
   ctx.fill();
   ctx.strokeStyle = "#fff";
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 40px sans-serif";
+  ctx.font = "bold 36px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(n), 32, 34);
+  ctx.fillText(text, 64, 34);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false }));
-  s.scale.set(0.3, 0.3, 1);
+  s.scale.set(size, size / 2, 1);
   return s;
 }
 
@@ -80,6 +83,32 @@ function pan(): THREE.Group {
   body.position.y = 0.03;
   const handle = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.025, 0.03), m);
   handle.position.set(0.3, 0.05, 0);
+  body.castShadow = handle.castShadow = true;
+  g.add(body, handle);
+  return g;
+}
+
+function pot(): THREE.Group {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color: 0xb8bdc4, roughness: 0.3, metalness: 0.9 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.2, 24), m);
+  body.position.y = 0.1;
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.02, 24), m);
+  lid.position.y = 0.21;
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), m);
+  knob.position.y = 0.25;
+  body.castShadow = lid.castShadow = true;
+  g.add(body, lid, knob);
+  return g;
+}
+
+function basket(): THREE.Group {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color: 0x6a6e75, roughness: 0.4, metalness: 0.9 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.3), m);
+  body.position.y = 0.06;
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.03), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 }));
+  handle.position.set(0.3, 0.1, 0);
   body.castShadow = handle.castShadow = true;
   g.add(body, handle);
   return g;
@@ -117,7 +146,7 @@ export class GameView {
 
   constructor(scene: THREE.Scene, private burners: THREE.MeshStandardMaterial[][]) {
     SEATS.forEach((s, i) => {
-      const back = s.z > 4 ? 1 : -1;
+      const back = s.yaw === 0 ? 1 : -1; // 背もたれ側
       const person = buildPerson(lookFor(0), "customer", true);
       person.group.position.set(s.x, 0.49, s.z + back * 0.08);
       person.group.rotation.y = s.yaw + Math.PI;
@@ -144,14 +173,17 @@ export class GameView {
       scene.add(mark);
       this.drinkMarks.push(mark);
 
-      const label = numberSprite(i + 1);
-      label.position.set(s.x, 2.4, s.z);
+      const label = tagSprite(seatLabel(i), 0.34);
+      label.position.set(s.x, 2.2, s.z);
       scene.add(label);
 
-      // テーブルの上(座った人の正面)
-      const tz = s.z > 4 ? 4.3 : 3.7;
-      this.tableDish.push(new Slot(scene, s.x - 0.05, 0.79, tz));
-      this.tableDrink.push(new Slot(scene, s.x + 0.32, 0.79, tz + (s.z > 4 ? 0.1 : -0.1)));
+      // テーブルの上(座った人の正面。右手側にドリンク)
+      const fx = -Math.sin(s.yaw) * 0.55;
+      const fz = -Math.cos(s.yaw) * 0.55;
+      const rx = Math.cos(s.yaw) * 0.22;
+      const rz = -Math.sin(s.yaw) * 0.22;
+      this.tableDish.push(new Slot(scene, s.x + fx - rx * 0.3, 0.79, s.z + fz - rz * 0.3));
+      this.tableDrink.push(new Slot(scene, s.x + fx + rx, 0.79, s.z + fz + rz));
     });
 
     for (let i = 0; i < QUEUE_MAX_SHOWN; i++) {
@@ -165,7 +197,12 @@ export class GameView {
       this.queue.push(baked);
     }
 
-    STOVES.forEach((s) => this.stoveSlot.push(new Slot(scene, s.x - 0.45, 0.96, s.z)));
+    STOVES.forEach((s) => {
+      this.stoveSlot.push(new Slot(scene, s.x, 0.97, s.z));
+      const tag = tagSprite(`${METHOD_NAME[s.kind]}${STOVES.filter((x, k) => x.kind === s.kind && k <= STOVES.indexOf(s)).length}`, 0.5, s.kind === "grill" ? "#a5471b" : s.kind === "boil" ? "#2a6f97" : "#9a7413");
+      tag.position.set(s.x, 1.6, s.z);
+      scene.add(tag);
+    });
     BARS.forEach((s) => this.barSlot.push(new Slot(scene, 9.4, 1.06, s.z)));
     for (let i = 0; i < 8; i++) {
       const p = PASS_SLOT(i);
@@ -210,7 +247,9 @@ export class GameView {
     g.stoves.forEach((id, i) => {
       const t = id === null ? undefined : byId.get(id);
       const cooking = t?.status === "cooking";
-      this.stoveSlot[i]!.set(!t ? "" : `${cooking ? "pan" : "dish"}${t.id}`, () => (cooking ? pan() : makeDish(t!.item)));
+      const kind = STOVES[i]!.kind;
+      const cookware = kind === "grill" ? pan : kind === "boil" ? pot : basket;
+      this.stoveSlot[i]!.set(!t ? "" : `${cooking ? "pan" : "dish"}${t.id}`, () => (cooking ? cookware() : makeDish(t!.item)));
       for (const m of this.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
     });
     g.bars.forEach((id, i) => {

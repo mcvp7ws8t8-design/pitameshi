@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
-import { type GameSnapshot, type TicketSnapshot } from "../shared/game";
-import { dishName, drinkName } from "../shared/menu";
-import { nearestTarget } from "../shared/layout";
+import { nextFor, type GameSnapshot, type TicketSnapshot } from "../shared/game";
+import { METHOD_NAME, dishName, drinkName, type Method } from "../shared/menu";
+import { STOVES, nearestTarget, seatLabel } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
 import { animateWalk, buildPerson, lookFor, type Person } from "./people";
@@ -178,7 +178,7 @@ function onGame(g: GameSnapshot) {
 }
 
 function slip(t: TicketSnapshot, selected: boolean): string {
-  return `<div class="slip ${selected ? "sel" : ""}"><span class="seat">${t.seat + 1}</span><span class="dot" style="background:${itemColor(t)}"></span><span class="nm">${itemName(t)}</span></div>`;
+  return `<div class="slip ${selected ? "sel" : ""}"><span class="seat">${seatLabel(t.seat)}</span><span class="dot" style="background:${itemColor(t)}"></span><span class="nm">${itemName(t)}</span></div>`;
 }
 
 function renderSide(g: GameSnapshot) {
@@ -186,20 +186,41 @@ function renderSide(g: GameSnapshot) {
   const kind = myRole === "kitchen" ? "food" : "drink";
   const sel = kind === "food" ? g.selFood : g.selDrink;
   const news = mine.filter((t) => t.kind === kind && t.status === "new");
-  const slots = (kind === "food" ? g.stoves : g.bars).map((id, i) => {
-    const t = id === null ? undefined : mine.find((x) => x.id === id);
-    const label = `${kind === "food" ? "コンロ" : "バー"}${i + 1}`;
-    const state = t ? `席${t.seat + 1} ${itemName(t)} <em class="${t.status === "ready" ? "ready" : "busy"}">${t.status === "ready" ? "できた" : "作成中"}</em>` : `<span class="dim">空き</span>`;
-    return `<div class="row"><span>${label}</span><span>${state}</span></div>`;
-  });
+  // ホール: ドリンクバーごとの状態。キッチン: 調理法ごとの集計と、できあがりの場所
+  let slots: string[];
+  if (kind === "drink") {
+    slots = g.bars.map((id, i) => {
+      const t = id === null ? undefined : mine.find((x) => x.id === id);
+      const state = t ? `${seatLabel(t.seat)} ${itemName(t)} <em class="${t.status === "ready" ? "ready" : "busy"}">${t.status === "ready" ? "できた" : "作成中"}</em>` : `<span class="dim">空き</span>`;
+      return `<div class="row"><span>バー${i + 1}</span><span>${state}</span></div>`;
+    });
+  } else {
+    const methods: Method[] = ["grill", "boil", "fry"];
+    slots = methods.map((m) => {
+      const ids = STOVES.map((s, i) => (s.kind === m ? g.stoves[i] : undefined)).filter((x) => x !== undefined);
+      const total = ids.length;
+      const used = ids.map((id) => (id === null ? undefined : mine.find((x) => x.id === id)));
+      const busy = used.filter((t) => t?.status === "cooking").length;
+      const ready = used.filter((t) => t?.status === "ready").length;
+      return `<div class="row"><span>${METHOD_NAME[m]} <span class="dim">${total}台</span></span><span>作成中 ${busy}${ready ? ` <em class="ready">できた ${ready}</em>` : ""} / 空き ${total - busy - ready}</span></div>`;
+    });
+    const readyList = g.stoves
+      .map((id, i) => ({ t: id === null ? undefined : mine.find((x) => x.id === id), i }))
+      .filter((x) => x.t?.status === "ready")
+      .slice(0, 5);
+    for (const { t, i } of readyList) {
+      const k = STOVES.filter((s, j) => s.kind === STOVES[i]!.kind && j <= i).length;
+      slots.push(`<div class="row"><span>${METHOD_NAME[STOVES[i]!.kind]}${k}</span><span>${seatLabel(t!.seat)} ${itemName(t!)} <em class="ready">できた</em></span></div>`);
+    }
+  }
   const held = mine.filter((t) => t.status === (myRole === "kitchen" ? "kitchen" : "hall"));
   const cap = myRole === "kitchen" ? 2 : 4;
   let html = `<h3>${kind === "food" ? "料理" : "ドリンク"}の注文 <span class="count">${news.length}</span><kbd>R</kbd></h3>`;
   html += news.slice(0, 7).map((t) => slip(t, t.id === sel)).join("");
   if (news.length > 7) html += `<div class="more">ほか ${news.length - 7} 件</div>`;
-  html += `<h3 class="sub">${kind === "food" ? "コンロ" : "ドリンクバー"}</h3>${slots.join("")}`;
+  html += `<h3 class="sub">${kind === "food" ? "調理場" : "ドリンクバー"}</h3>${slots.join("")}`;
   html += `<h3 class="sub">${myRole === "kitchen" ? "手" : "トレー"} <span class="count">${held.length}/${cap}</span></h3>`;
-  html += held.length ? held.map((t) => `<div class="row"><span>席${t.seat + 1}</span><span>${itemName(t)}</span></div>`).join("") : `<div class="dim">なし</div>`;
+  html += held.length ? held.map((t) => `<div class="row"><span>${seatLabel(t.seat)}</span><span>${itemName(t)}</span></div>`).join("") : `<div class="dim">なし</div>`;
   if (myRole === "hall") html += `<div class="row foot"><span>受け渡し台の料理</span><span>${mine.filter((t) => t.status === "pass").length}</span></div>`;
   $("side").innerHTML = html;
 }
@@ -224,18 +245,25 @@ function promptText(): string {
   if (target.kind === "seat") {
     const s = game.seats[target.i];
     if (!s) return "";
-    if (s.s === "waitOrder") return `E|席${target.i + 1}の注文を取る`;
+    if (s.s === "waitOrder") return `E|${seatLabel(target.i)}の注文を取る`;
     const held = tickets.filter((x) => x.seat === target.i && x.status === "hall");
     if (held.length > 0) return `E|${held.map(itemName).join("・")}を出す`;
     return s.s === "waitFood" ? "|料理もドリンクも持っていません" : "|食事中";
   }
-  if (target.kind === "stove" || target.kind === "bar") {
-    const isBar = target.kind === "bar";
-    const id = (isBar ? game.bars : game.stoves)[target.i];
+  if (target.kind === "bar") {
+    const id = game.bars[target.i];
     const t = id === null || id === undefined ? undefined : tickets.find((x) => x.id === id);
     if (t) return t.status === "ready" ? `E|${itemName(t)}を取る` : "|作成中";
-    const sel = tickets.find((x) => x.id === (isBar ? game!.selDrink : game!.selFood));
-    return sel ? `E|席${sel.seat + 1}の${itemName(sel)}を作る` : "|注文がありません";
+    const sel = tickets.find((x) => x.id === game!.selDrink);
+    return sel ? `E|${seatLabel(sel.seat)}の${itemName(sel)}を作る` : "|注文がありません";
+  }
+  if (target.kind === "stove") {
+    const station = STOVES[target.i]!;
+    const id = game.stoves[target.i];
+    const t = id === null || id === undefined ? undefined : tickets.find((x) => x.id === id);
+    if (t) return t.status === "ready" ? `E|${itemName(t)}を取る` : `|${METHOD_NAME[station.kind]}の最中`;
+    const next = nextFor(tickets, game.selFood, station.kind);
+    return next ? `E|${seatLabel(next.seat)}の${itemName(next)}を${METHOD_NAME[station.kind]}で作る` : `|${METHOD_NAME[station.kind]}で作る注文がありません`;
   }
   if (myRole === "hall") return tickets.some((t) => t.status === "pass") ? "E|受け渡し台から料理を取る" : "";
   return tickets.some((t) => t.status === "kitchen") ? "E|料理を受け渡し台に置く" : "";

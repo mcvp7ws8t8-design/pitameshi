@@ -8,12 +8,12 @@ type DrinkShape = "glass" | "mug" | "wine" | "beer" | "sake";
 
 // 順番は src/shared/menu.ts と同じ
 const DISH_LOOK: { shape: DishShape; color: number; accent: number }[] = [
-  { shape: "cube", color: 0xf4f1e6, accent: 0x6aa84f }, // 冷やっこ
-  { shape: "plate", color: 0x5aa84a, accent: 0xd9432e }, // サラダ
+  { shape: "cube", color: 0xf4f1e6, accent: 0x6aa84f }, // 湯豆腐
+  { shape: "plate", color: 0x5aa84a, accent: 0xd9432e }, // 温野菜サラダ
   { shape: "bowl", color: 0xf0c23a, accent: 0xf6e7a0 }, // コーンスープ
-  { shape: "plate", color: 0xf4f4ee, accent: 0x1c1c1c }, // おにぎり
+  { shape: "plate", color: 0xf4f4ee, accent: 0x1c1c1c }, // 焼きおにぎり
   { shape: "plate", color: 0xe6b84a, accent: 0xd9a43a }, // フライドポテト
-  { shape: "burger", color: 0xe9c88a, accent: 0x6aa84f }, // サンドイッチ
+  { shape: "burger", color: 0xe9c88a, accent: 0x6aa84f }, // ホットサンド
   { shape: "plate", color: 0xc8832e, accent: 0xe8b04a }, // から揚げ
   { shape: "plate", color: 0xe0b979, accent: 0xa8662a }, // 餃子
   { shape: "plate", color: 0x9a4f22, accent: 0x6e3414 }, // 焼き鳥
@@ -24,7 +24,7 @@ const DISH_LOOK: { shape: DishShape; color: number; accent: number }[] = [
   { shape: "plate", color: 0xf0c040, accent: 0xc0392b }, // オムライス
   { shape: "plate", color: 0xf3e2a8, accent: 0x3a2a1a }, // カルボナーラ
   { shape: "bowl", color: 0xd9a35a, accent: 0xf4e9c8 }, // ラーメン
-  { shape: "sushi", color: 0xf4f1e6, accent: 0xe4604a }, // 寿司盛り合わせ
+  { shape: "plate", color: 0xe0a850, accent: 0xe4604a }, // エビフライ
   { shape: "plate", color: 0xc98a35, accent: 0x7fae4a }, // とんかつ定食
   { shape: "plate", color: 0xe0a850, accent: 0xc8782a }, // 天ぷら盛り合わせ
   { shape: "plate", color: 0x5a2e1c, accent: 0xe8d46a }, // ステーキ

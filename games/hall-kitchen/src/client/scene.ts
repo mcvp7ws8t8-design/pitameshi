@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { BARS, SEATS, STOVES } from "../shared/layout";
+import { BARS, SEATS, STOVES, TABLES, TABLE_SIZE } from "../shared/layout";
 import * as tex from "./textures";
 
 const H = 3.2; // 天井の高さ
@@ -136,39 +136,50 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
     scene.add(bulb);
   }
 
-  // ---- ホール: テーブルと椅子(席は layout.ts と同じ位置) ----
+  // ---- ホール: テーブルと椅子(位置は layout.ts の TABLES / SEATS と同じ) ----
   const woodChair = plain(0x6a4529, 0.6);
   const seatPad = plain(0x7e2f2f, 0.85);
-  for (const x of [-6, -2, 2, 6]) {
-    scene.add(box(1.4, 0.06, 1.4, tableWood(1.5, 1.5), x, 0.76, 4, { round: 0.02 }));
-    scene.add(cylinder(0.07, 0.09, 0.73, plain(0x2b2b2d, 0.35, 0.9), x, 0.365, 4));
-    scene.add(cylinder(0.32, 0.34, 0.03, plain(0x2b2b2d, 0.35, 0.9), x, 0.015, 4, 28));
+  const metal = plain(0x2b2b2d, 0.35, 0.9);
+  const glassVase = new THREE.MeshPhysicalMaterial({ color: 0xcfe8f5, roughness: 0.05, transparent: true, opacity: 0.55 });
+  const lampShade = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.35, metalness: 0.85, side: THREE.DoubleSide });
+  const lampBulb = new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb860, emissiveIntensity: 3 });
+  TABLES.forEach((t) => {
+    const { w, d } = TABLE_SIZE[t.seats];
+    scene.add(box(w, 0.06, d, tableWood(w * 1.1, d * 1.1), t.x, 0.76, t.z, { round: 0.02 }));
+    // 脚は、2名掛けは1本、4名掛けは2本
+    const legs = t.seats === 2 ? [0] : [-0.45, 0.45];
+    for (const lx of legs) {
+      scene.add(cylinder(0.06, 0.08, 0.73, metal, t.x + lx, 0.365, t.z));
+      scene.add(cylinder(0.26, 0.28, 0.03, metal, t.x + lx, 0.015, t.z, 24));
+    }
     // 花瓶と調味料
-    scene.add(cylinder(0.035, 0.045, 0.14, new THREE.MeshPhysicalMaterial({ color: 0xcfe8f5, roughness: 0.05, transparent: true, opacity: 0.55 }), x - 0.45, 0.86, 3.65, 14));
-    scene.add(cylinder(0.004, 0.004, 0.22, plain(0x3f7a3a, 0.8), x - 0.45, 0.98, 3.65, 6));
-    const flower = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), plain(0xd9486a, 0.7));
-    flower.position.set(x - 0.45, 1.1, 3.65);
+    scene.add(cylinder(0.03, 0.04, 0.12, glassVase, t.x - w * 0.3, 0.85, t.z, 14));
+    scene.add(cylinder(0.004, 0.004, 0.2, plain(0x3f7a3a, 0.8), t.x - w * 0.3, 0.96, t.z, 6));
+    const flower = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), plain(0xd9486a, 0.7));
+    flower.position.set(t.x - w * 0.3, 1.07, t.z);
     scene.add(flower);
-    scene.add(cylinder(0.018, 0.02, 0.06, plain(0xf4f1ea, 0.3), x + 0.5, 0.82, 4.35, 10), cylinder(0.018, 0.02, 0.06, plain(0x2b2b2b, 0.3), x + 0.56, 0.82, 4.35, 10));
-    // 吊りランプ
-    scene.add(cylinder(0.006, 0.006, H - 2.3, plain(0x222222, 0.5), x, (H + 2.3) / 2, 4, 6));
-    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 0.26, 28, 1, true), new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.35, metalness: 0.85, side: THREE.DoubleSide }));
-    shade.position.set(x, 2.25, 4);
-    shade.castShadow = true;
+    scene.add(cylinder(0.016, 0.018, 0.055, plain(0xf4f1ea, 0.3), t.x + w * 0.28, 0.82, t.z, 10), cylinder(0.016, 0.018, 0.055, plain(0x2b2b2b, 0.3), t.x + w * 0.28 + 0.05, 0.82, t.z, 10));
+    // 吊りランプ(見た目だけ。実際の光は下でまとめて置く)
+    scene.add(cylinder(0.006, 0.006, H - 2.3, plain(0x222222, 0.5), t.x, (H + 2.3) / 2, t.z, 6));
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.26, 0.24, 24, 1, true), lampShade);
+    shade.position.set(t.x, 2.25, t.z);
     scene.add(shade);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 10), new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb860, emissiveIntensity: 3 }));
-    bulb.position.set(x, 2.2, 4);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), lampBulb);
+    bulb.position.set(t.x, 2.2, t.z);
     scene.add(bulb);
-    const light = new THREE.PointLight(0xffc98a, 11, 7.5, 2);
-    light.position.set(x, 2.1, 4);
+  });
+  // 実際に照らす光は、列ごとに数個だけ(全部のランプに置くと重いので)
+  for (const [x, z] of [[-5, 2.8], [0, 2.5], [5, 2.8], [-4.4, 5.3], [4.4, 5.3], [0, 7.6]] as const) {
+    const light = new THREE.PointLight(0xffc98a, 13, 8, 2);
+    light.position.set(x, 2.1, z);
     scene.add(light);
   }
   for (const s of SEATS) {
-    const dir = s.z > 4 ? 1 : -1; // 背もたれはテーブルと反対側
-    scene.add(box(0.44, 0.05, 0.44, seatPad, s.x, 0.46, s.z, { round: 0.02 }));
-    scene.add(box(0.44, 0.44, 0.045, woodChair, s.x, 0.74, s.z + dir * 0.2, { round: 0.015 }));
-    for (const [dx, dz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]] as const) {
-      scene.add(cylinder(0.018, 0.015, 0.45, woodChair, s.x + dx, 0.225, s.z + dz, 8));
+    const dir = s.yaw === 0 ? 1 : -1; // 背もたれはテーブルと反対側
+    scene.add(box(0.42, 0.05, 0.42, seatPad, s.x, 0.46, s.z, { round: 0.02 }));
+    scene.add(box(0.42, 0.42, 0.045, woodChair, s.x, 0.73, s.z + dir * 0.19, { round: 0.015 }));
+    for (const [dx, dz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]] as const) {
+      scene.add(cylinder(0.018, 0.015, 0.44, woodChair, s.x + dx, 0.22, s.z + dz, 8));
     }
   }
 
@@ -228,39 +239,60 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   scene.add(neon);
   void BARS;
 
-  // ---- キッチン: コンロ・シンク・冷蔵庫・作業台(コンロは layout.ts の STOVES と同じ位置) ----
+  // ---- キッチン: 調理場(位置は layout.ts の STOVES と同じ)・シンク・冷蔵庫・作業台 ----
+  // 焼く5(奥の壁)・揚げる2(奥の壁)・茹でる4(左の壁)。種類で見た目を変える。
   const burners: THREE.MeshStandardMaterial[][] = [];
+  const glowMat = () => new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.4, metalness: 0.8, emissive: 0xff5a1a, emissiveIntensity: 0 });
   for (const s of STOVES) {
-    scene.add(box(2, 0.9, 1, steelM(2, 1), s.x, 0.45, s.z, { round: 0.01 }));
-    scene.add(box(2, 0.04, 1.02, plain(0x1b1b1d, 0.3, 0.7), s.x, 0.92, s.z));
+    const side = s.kind === "boil";
+    const w = side ? 1.4 : 1.8; // 壁に沿った長さ
+    const sx = side ? 1.0 : w;
+    const sz = side ? w : 1.0;
+    scene.add(box(sx, 0.9, sz, steelM(2, 1), s.x, 0.45, s.z, { round: 0.01 }));
+    scene.add(box(sx + 0.02, 0.04, sz + 0.02, plain(0x1b1b1d, 0.3, 0.7), s.x, 0.92, s.z));
     const mats: THREE.MeshStandardMaterial[] = [];
-    for (const dx of [-0.45, 0.45]) {
-      const m = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.4, metalness: 0.8, emissive: 0xff5a1a, emissiveIntensity: 0 });
+    if (s.kind === "grill") {
+      // 鉄板
+      const m = glowMat();
       mats.push(m);
-      const ring = cylinder(0.2, 0.2, 0.02, m, s.x + dx, 0.95, s.z, 28);
-      ring.receiveShadow = false;
-      scene.add(ring);
+      const plate = box(1.4, 0.03, 0.7, m, s.x, 0.95, s.z, { recv: false });
+      scene.add(plate);
+    } else if (s.kind === "boil") {
+      // 丸い鍋穴(水面)
+      const water = new THREE.MeshStandardMaterial({ color: 0x6fa8cf, roughness: 0.08, metalness: 0.1, emissive: 0x7ec8ff, emissiveIntensity: 0 });
+      mats.push(water);
+      const vat = cylinder(0.38, 0.38, 0.03, water, s.x, 0.95, s.z, 28);
+      scene.add(vat);
+      scene.add(cylinder(0.42, 0.42, 0.04, plain(0x888d94, 0.3, 0.9), s.x, 0.93, s.z, 28));
+    } else {
+      // 揚げ物の油槽
+      const oil = new THREE.MeshStandardMaterial({ color: 0xc88a1a, roughness: 0.15, emissive: 0xff5a1a, emissiveIntensity: 0 });
+      mats.push(oil);
+      scene.add(box(1.3, 0.03, 0.7, oil, s.x, 0.95, s.z, { recv: false }));
+      scene.add(box(1.4, 0.06, 0.8, plain(0x888d94, 0.3, 0.9), s.x, 0.93, s.z));
     }
     burners.push(mats);
-    for (let k = 0; k < 4; k++) {
-      scene.add(cylinder(0.03, 0.03, 0.03, plain(0x333333, 0.4, 0.6), s.x - 0.75 + k * 0.5, 0.82, s.z + 0.52, 10));
+    // つまみ
+    for (let k = 0; k < 3; k++) {
+      const front = side ? [s.x + 0.52, s.z - 0.35 + k * 0.35] : [s.x - 0.5 + k * 0.5, s.z + 0.52];
+      scene.add(cylinder(0.03, 0.03, 0.03, plain(0x333333, 0.4, 0.6), front[0]!, 0.8, front[1]!, 10));
     }
   }
-  scene.add(box(5.4, 0.45, 1.3, steelM(3, 1), -4.5, 2.35, -9.2, { round: 0.02 }), box(1.0, 0.8, 1.0, steelM(1, 1), -4.5, 2.95, -9.2));
-  scene.add(box(2, 0.9, 1, steelM(2, 1), 0, 0.45, -8.8, { round: 0.01 })); // シンク台
-  scene.add(box(1.5, 0.05, 0.7, plain(0x9aa3ab, 0.25, 0.9), 0, 0.92, -8.8), cylinder(0.015, 0.015, 0.4, steelM(1, 1), 0, 1.15, -9.2, 8));
-  scene.add(box(0.03, 0.03, 0.25, steelM(1, 1), 0, 1.35, -9.07));
-  scene.add(box(2, 1.9, 1, steelM(2, 2), 4, 0.95, -8.8, { round: 0.02 })); // 冷蔵庫
-  scene.add(box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 3.25, 1.2, -8.25), box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 4.75, 1.2, -8.25));
-  scene.add(box(0.01, 1.8, 0.02, plain(0x555960, 0.5), 4, 0.95, -8.29));
-  for (const sx of [-9.4, 9.4]) {
-    scene.add(box(1.0, 0.9, 5, steelM(2, 3), sx, 0.45, -5, { round: 0.01 }), box(1.04, 0.05, 5.04, steelM(3, 2), sx, 0.93, -5));
-    scene.add(box(0.4, 0.04, 5, wood(2, 1), sx + (sx < 0 ? -0.2 : 0.2) * 0.4, 1.9, -5), box(0.4, 0.04, 5, wood(2, 1), sx + (sx < 0 ? -0.2 : 0.2) * 0.4, 2.35, -5));
-    for (let k = 0; k < 8; k++) {
-      const z = -7.2 + k * 0.62;
-      const potM = plain([0xb8bdc4, 0x8a8f96, 0xc9a24a, 0x6a6e75][k % 4]!, 0.3, 0.9);
-      scene.add(cylinder(0.14, 0.12, 0.16, potM, sx, 2.0, z, 18), cylinder(0.12, 0.1, 0.14, potM, sx, 2.45, z, 18));
-    }
+  // 換気フード(奥の壁の調理場の上)
+  scene.add(box(13, 0.45, 1.3, steelM(6, 1), -2.5, 2.35, -9.2, { round: 0.02 }), box(1.0, 0.8, 1.0, steelM(1, 1), -2.5, 2.95, -9.2));
+  scene.add(box(2, 0.9, 1, steelM(2, 1), 8.5, 0.45, -8.8, { round: 0.01 })); // シンク台
+  scene.add(box(1.5, 0.05, 0.7, plain(0x9aa3ab, 0.25, 0.9), 8.5, 0.92, -8.8), cylinder(0.015, 0.015, 0.4, steelM(1, 1), 8.5, 1.15, -9.2, 8));
+  scene.add(box(0.03, 0.03, 0.25, steelM(1, 1), 8.5, 1.35, -9.07));
+  scene.add(box(2, 1.9, 1, steelM(2, 2), 6.2, 0.95, -8.8, { round: 0.02 })); // 冷蔵庫
+  scene.add(box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 5.45, 1.2, -8.25), box(0.04, 0.5, 0.04, plain(0x888c92, 0.3, 1), 6.95, 1.2, -8.25));
+  scene.add(box(0.01, 1.8, 0.02, plain(0x555960, 0.5), 6.2, 0.95, -8.29));
+  // 右の壁沿いの作業台と棚
+  scene.add(box(1.0, 0.9, 4.8, steelM(2, 3), 9.4, 0.45, -5, { round: 0.01 }), box(1.04, 0.05, 4.84, steelM(3, 2), 9.4, 0.93, -5));
+  scene.add(box(0.4, 0.04, 4.8, wood(2, 1), 9.7, 1.9, -5), box(0.4, 0.04, 4.8, wood(2, 1), 9.7, 2.35, -5));
+  for (let k = 0; k < 7; k++) {
+    const z = -7.2 + k * 0.66;
+    const potM = plain([0xb8bdc4, 0x8a8f96, 0xc9a24a, 0x6a6e75][k % 4]!, 0.3, 0.9);
+    scene.add(cylinder(0.14, 0.12, 0.16, potM, 9.7, 2.0, z, 18), cylinder(0.12, 0.1, 0.14, potM, 9.7, 2.45, z, 18));
   }
   // キッチンの天井灯
   for (const [x, z] of [[-5, -3.5], [3, -3.5], [-1, -7.5]] as const) {
