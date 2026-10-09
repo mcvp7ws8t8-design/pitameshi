@@ -3,7 +3,7 @@
 // 数字は CONFIG にまとめてある。遊んでみて調整する。
 
 import { CHAIR_ORDER, SEATS, STOVES, TABLES, nearestTarget, seatLabel } from "./layout";
-import { DISHES, DRINKS, METHOD_NAME, dishName, drinkName, methodOf, type Method } from "./menu";
+import { DISHES, DRINKS, INGREDIENTS, METHOD_NAME, dishName, drinkName, ingredientName, methodOfIngredient, type Method } from "./menu";
 import type { Role } from "./room";
 
 export const CONFIG = {
@@ -16,7 +16,7 @@ export const CONFIG = {
   foodPatience: 70, // 注文してから料理が届くまで
   eatTime: 4,
   holdHall: 4, // ホールが一度に運べる数(料理とドリンクの合計)
-  holdKitchen: 2,
+  holdKitchen: 4, // キッチンが手に持てる食材の数(生のものも、調理したものも)
   passMax: 8, // 受け渡し台に置ける数
   bars: 2, // ドリンクバーの台数
   spawnStart: 13, // グループが来る間隔(秒)。ゲーム中に spawnEnd まで縮む
@@ -26,26 +26,31 @@ export const CONFIG = {
 
 const METHOD_VERB: Record<Method, string> = { grill: "焼き始めた", boil: "茹で始めた", fry: "揚げ始めた" };
 
-/** その調理法の調理場で次に作る料理の注文。選んでいるものが合えばそれ、合わなければ一番古いもの */
-export function nextFor<T extends { id: number; kind: Kind; item: number; status: TicketStatus }>(
-  tickets: T[],
-  selected: number | null,
-  method: Method,
-): T | undefined {
-  const list = tickets.filter((t) => t.kind === "food" && t.status === "new" && methodOf(t.item) === method).sort((a, b) => a.id - b.id);
-  return list.find((t) => t.id === selected) ?? list[0];
-}
+/** 調理場に置いた食材の番号。注文の番号 × 8 + 何番目の食材か(料理の食材は3つまで) */
+const partId = (ticket: number, idx: number) => ticket * 8 + idx;
+export const partTicket = (id: number) => Math.floor(id / 8);
+export const partIndex = (id: number) => id % 8;
 
 export const spawnInterval = (clock: number): number =>
   Math.max(CONFIG.spawnEnd, CONFIG.spawnStart - ((CONFIG.spawnStart - CONFIG.spawnEnd) * clock) / CONFIG.duration);
 
 export type Phase = "waiting" | "countdown" | "playing" | "over";
 export type CustomerState = "queue" | "waitOrder" | "waitFood" | "eating";
-// food(料理)もdrink(ドリンク)も同じ流れ。
-// new: 作る前 / cooking: コンロやドリンクバーの上で作っている / ready: できあがり(その場に置いてある) /
-// kitchen: キッチンが持っている(料理だけ) / pass: 受け渡し台(料理だけ) / hall: ホールが持っている
+// 注文は料理(food)とドリンク(drink)。
+// 料理: new(食材を集めて調理中) → pass(盛り付けが終わって受け渡し台) → hall(ホールが持っている)
+// ドリンク: new → cooking(ドリンクバーで作っている) → ready(できあがり) → hall
 export type Kind = "food" | "drink";
-export type TicketStatus = "new" | "cooking" | "ready" | "kitchen" | "pass" | "hall";
+export type TicketStatus = "new" | "cooking" | "ready" | "pass" | "hall";
+// 料理の食材1つ1つの状態
+// need: まだ冷蔵庫から取っていない / raw: 取って持っている(生) / cooking: 調理場で調理中 /
+// ready: 調理できあがり(調理場の上) / cooked: 取って持っている(調理済み) / plated: 盛り付け台に置いた
+export type PartState = "need" | "raw" | "cooking" | "ready" | "cooked" | "plated";
+
+interface Part {
+  ing: number;
+  st: PartState;
+  left: number;
+}
 
 interface Customer {
   id: number;
@@ -67,6 +72,7 @@ interface Ticket {
   customer: number;
   status: TicketStatus;
   left: number;
+  parts: Part[]; // 料理だけ
 }
 
 export interface TicketSnapshot {
@@ -75,6 +81,7 @@ export interface TicketSnapshot {
   item: number;
   seat: number;
   status: TicketStatus;
+  parts?: { ing: number; st: PartState }[];
 }
 export interface SeatSnapshot {
   id: number; // お客さんの番号(見た目を決めるのに使う)
@@ -185,9 +192,17 @@ export class Game {
     }
 
     for (const t of this.tickets) {
-      if (t.status !== "cooking") continue;
-      t.left -= dt;
-      if (t.left <= 0) t.status = "ready";
+      if (t.kind === "drink") {
+        if (t.status !== "cooking") continue;
+        t.left -= dt;
+        if (t.left <= 0) t.status = "ready";
+        continue;
+      }
+      for (const p of t.parts) {
+        if (p.st !== "cooking") continue;
+        p.left -= dt;
+        if (p.left <= 0) p.st = "ready";
+      }
     }
 
     for (const c of [...this.customers]) {
@@ -276,7 +291,10 @@ export class Game {
 
   private dropTicket(t: Ticket): void {
     this.tickets = this.tickets.filter((x) => x !== t);
-    for (let i = 0; i < this.stoves.length; i++) if (this.stoves[i] === t.id) this.stoves[i] = null;
+    for (let i = 0; i < this.stoves.length; i++) {
+      const id = this.stoves[i];
+      if (id !== null && id !== undefined && partTicket(id) === t.id) this.stoves[i] = null;
+    }
     for (let i = 0; i < this.bars.length; i++) if (this.bars[i] === t.id) this.bars[i] = null;
     if (this.selFood === t.id) this.selFood = null;
     if (this.selDrink === t.id) this.selDrink = null;
@@ -324,7 +342,8 @@ export class Game {
       if (target.kind === "seat") return this.hallSeat(target.i);
       return target.kind === "bar" ? this.hallBar(target.i) : this.hallPass();
     }
-    return target.kind === "stove" ? this.kitchenStove(target.i) : this.kitchenPass();
+    if (target.kind === "stove") return this.kitchenStove(target.i);
+    return target.kind === "fridge" ? this.kitchenFridge() : this.kitchenPass();
   }
 
   private hallSeat(seat: number): string {
@@ -332,7 +351,8 @@ export class Game {
     if (!c) return "";
     if (c.state === "waitOrder") {
       for (const [kind, item] of [["food", c.dish], ["drink", c.drink]] as const) {
-        this.tickets.push({ id: this.nextId++, kind, item, seat, customer: c.id, status: "new", left: 0 });
+        const parts = kind === "food" ? DISHES[item]!.parts.map((ing) => ({ ing, st: "need" as const, left: 0 })) : [];
+        this.tickets.push({ id: this.nextId++, kind, item, seat, customer: c.id, status: "new", left: 0, parts });
       }
       c.state = "waitFood";
       c.max = c.patience = CONFIG.foodPatience;
@@ -394,37 +414,78 @@ export class Game {
     return `料理を${n}つ取った`;
   }
 
-  private kitchenStove(i: number): string {
-    const station = STOVES[i]!;
-    const t = this.ticketIn(this.stoves, i);
-    if (t) {
-      if (t.status === "cooking") return `${METHOD_NAME[station.kind]}の最中です`;
-      if (this.count("kitchen") >= CONFIG.holdKitchen) return "手がいっぱいです";
-      t.status = "kitchen";
-      this.stoves[i] = null;
-      return `${dishName(t.item)}を取った`;
+  /** キッチンが手に持っている食材(生のものと調理済みのもの) */
+  private heldParts(): { t: Ticket; p: Part; idx: number }[] {
+    const out: { t: Ticket; p: Part; idx: number }[] = [];
+    for (const t of this.tickets) {
+      t.parts.forEach((p, idx) => {
+        if (p.st === "raw" || p.st === "cooked") out.push({ t, p, idx });
+      });
     }
-    const next = nextFor(this.tickets, this.selFood, station.kind);
-    if (!next) return `${METHOD_NAME[station.kind]}で作る注文がありません`;
-    next.status = "cooking";
-    next.left = DISHES[next.item]?.cook ?? 1;
-    this.stoves[i] = next.id;
-    this.selFood = null;
-    return `${seatLabel(next.seat)}の${dishName(next.item)}を${METHOD_VERB[station.kind]}`;
+    return out;
   }
 
-  private kitchenPass(): string {
-    const held = this.tickets.filter((t) => t.status === "kitchen");
-    if (held.length === 0) return "持っている料理がありません";
-    let room = CONFIG.passMax - this.count("pass");
-    if (room <= 0) return "受け渡し台がいっぱいです";
-    let n = 0;
-    for (const t of held) {
-      if (room-- <= 0) break;
-      t.status = "pass";
-      n++;
+  /** 冷蔵庫: 選んでいる注文(なければ一番古い注文)の食材を、手に持てるだけ取る */
+  private kitchenFridge(): string {
+    const room = CONFIG.holdKitchen - this.heldParts().length;
+    if (room <= 0) return "手がいっぱいです";
+    const list = this.tickets.filter((t) => t.kind === "food" && t.status === "new" && t.parts.some((p) => p.st === "need")).sort((a, b) => a.id - b.id);
+    const t = list.find((x) => x.id === this.selFood) ?? list[0];
+    if (!t) return "取る食材がありません";
+    const names: string[] = [];
+    for (const p of t.parts) {
+      if (p.st !== "need" || names.length >= room) continue;
+      p.st = "raw";
+      names.push(ingredientName(p.ing));
     }
-    return `料理を${n}つ台に置いた`;
+    if (!t.parts.some((p) => p.st === "need")) this.selFood = null;
+    return `${seatLabel(t.seat)} ${dishName(t.item)}: ${names.join("・")}を取った`;
+  }
+
+  /** 調理場: できあがりがあれば取る。空いていれば、持っている生の食材のうち合うものを調理に入れる */
+  private kitchenStove(i: number): string {
+    const station = STOVES[i]!;
+    const id = this.stoves[i];
+    if (id !== null && id !== undefined) {
+      const t = this.tickets.find((x) => x.id === partTicket(id))!;
+      const p = t.parts[partIndex(id)]!;
+      if (p.st === "cooking") return `${METHOD_NAME[station.kind]}の最中です`;
+      if (this.heldParts().length >= CONFIG.holdKitchen) return "手がいっぱいです";
+      p.st = "cooked";
+      this.stoves[i] = null;
+      return `${ingredientName(p.ing)}を取った`;
+    }
+    const raws = this.heldParts().filter((h) => h.p.st === "raw");
+    const fits = raws.filter((h) => methodOfIngredient(h.p.ing) === station.kind);
+    if (fits.length === 0) {
+      return raws.length === 0 ? "調理する食材を持っていません" : `${METHOD_NAME[station.kind]}で作れる食材がありません`;
+    }
+    fits.sort((a, b) => Number(b.t.id === this.selFood) - Number(a.t.id === this.selFood) || a.t.id - b.t.id || a.idx - b.idx);
+    const { t, p, idx } = fits[0]!;
+    p.st = "cooking";
+    p.left = INGREDIENTS[p.ing]?.cook ?? 1;
+    this.stoves[i] = partId(t.id, idx);
+    return `${ingredientName(p.ing)}を${METHOD_VERB[station.kind]}`;
+  }
+
+  /** 盛り付け台: 調理済みの食材を置く。1皿ぶんそろうと完成して、受け渡し台に出る */
+  private kitchenPass(): string {
+    const cooked = this.heldParts().filter((h) => h.p.st === "cooked");
+    if (cooked.length === 0) return "盛り付ける食材を持っていません";
+    if (this.count("pass") >= CONFIG.passMax) return "受け渡し台がいっぱいです";
+    const done: string[] = [];
+    let remaining = 0;
+    for (const { t, p } of cooked) {
+      p.st = "plated";
+      if (t.parts.every((x) => x.st === "plated") && t.status === "new") {
+        t.status = "pass";
+        done.push(dishName(t.item));
+      }
+    }
+    if (done.length > 0) return `${done.join("・")}が完成`;
+    const t = cooked[0]!.t;
+    remaining = t.parts.filter((x) => x.st !== "plated").length;
+    return `${dishName(t.item)}の食材を置いた(あと${remaining}つ)`;
   }
 
   snapshot(): GameSnapshot {
@@ -443,7 +504,14 @@ export class Game {
       maxAngry: CONFIG.maxAngry,
       queue: this.customers.filter((c) => c.state === "queue").length,
       seats,
-      tickets: this.tickets.map(({ id, kind, item, seat, status }) => ({ id, kind, item, seat, status })),
+      tickets: this.tickets.map(({ id, kind, item, seat, status, parts }) => ({
+        id,
+        kind,
+        item,
+        seat,
+        status,
+        ...(kind === "food" ? { parts: parts.map((p) => ({ ing: p.ing, st: p.st })) } : {}),
+      })),
       selFood: this.currentSelected("food"),
       selDrink: this.currentSelected("drink"),
       stoves: [...this.stoves],

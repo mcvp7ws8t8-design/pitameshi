@@ -1,14 +1,15 @@
-// 一人称の手元。自分の腕と、運んでいるもの(ホールはトレー、キッチンは両手に皿)。
+// 一人称の手元。自分の腕と、運んでいるもの(トレーに載せる。ホールは料理とドリンク、キッチンは食材)。
 // 壁に近づいても手がめり込まないよう、別のシーンに分けて重ねて描く。
 
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { Role } from "../shared/room";
-import { makeDish, makeDrink } from "./items";
+import { makeDish, makeDrink, makeIngredient } from "./items";
 
 export interface Held {
-  kind: "food" | "drink";
-  item: number;
+  kind: "food" | "drink" | "ing";
+  item: number; // 料理・ドリンク・食材の番号
+  cooked?: boolean; // 食材のとき、調理済みか
 }
 
 const sleeve = new THREE.MeshStandardMaterial({ color: 0xf1efe9, roughness: 0.8 });
@@ -51,10 +52,10 @@ export class ViewModel {
   setRole(role: Role) {
     this.role = role;
     this.key = "";
-    this.tray.visible = role === "hall";
+    this.tray.visible = true;
     this.arms.clear();
     // 手の位置。ホールはトレーの両端、キッチンは体の前
-    const hands: [number, number, number][] = role === "hall" ? [[-0.2, -0.32, -0.55], [0.2, -0.32, -0.55]] : [[-0.2, -0.3, -0.42], [0.2, -0.3, -0.42]];
+    const hands: [number, number, number][] = [[-0.2, -0.32, -0.55], [0.2, -0.32, -0.55]];
     hands.forEach(([x, y, z], i) => {
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), skin);
       hand.position.set(x, y, z);
@@ -65,23 +66,16 @@ export class ViewModel {
 
   /** 持っているものを台の上に並べる。変わったときだけ作り直す */
   setHeld(held: Held[]) {
-    const key = held.map((h) => `${h.kind}${h.item}`).join(",");
+    const key = held.map((h) => `${h.kind}${h.item}${h.cooked ? "c" : ""}`).join(",");
     if (key === this.key) return;
     this.key = key;
     this.items.clear();
     const trayPos: [number, number][] = [[-0.1, -0.07], [0.1, -0.07], [-0.1, 0.07], [0.1, 0.07]];
-    const handPos: [number, number][] = [[-0.2, -0.46], [0.2, -0.46]];
     held.slice(0, 4).forEach((h, i) => {
-      const o = h.kind === "food" ? makeDish(h.item) : makeDrink(h.item);
+      const o = h.kind === "food" ? makeDish(h.item) : h.kind === "drink" ? makeDrink(h.item) : makeIngredient(h.item, !!h.cooked);
       o.traverse((c) => ((c as THREE.Mesh).castShadow = false));
-      if (this.role === "hall") {
-        o.scale.setScalar(0.6);
-        o.position.set(trayPos[i]![0], -0.295, -0.55 + trayPos[i]![1]);
-      } else {
-        const [x, z] = handPos[i % 2]!;
-        o.scale.setScalar(0.6);
-        o.position.set(x, -0.3, z);
-      }
+      o.scale.setScalar(h.kind === "ing" ? 1.1 : 0.6);
+      o.position.set(trayPos[i]![0], -0.295, -0.55 + trayPos[i]![1]);
       this.items.add(o);
     });
   }

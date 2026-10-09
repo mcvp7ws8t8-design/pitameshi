@@ -76,7 +76,7 @@
     .segs i { width: 7px; height: 16px; border-radius: 2px; background: #ffffff26; }
     .segs i.on { background: var(--bad); box-shadow: 0 0 6px #d9453b99; }
 
-    #side { position: fixed; right: 14px; top: 96px; width: 270px; max-height: calc(100vh - 190px); overflow: hidden; padding: 12px; font-size: 13px; background: var(--glass); border: 1px solid #ffffff22; border-radius: 16px; backdrop-filter: blur(6px); pointer-events: none; box-shadow: 0 6px 20px #0006; }
+    #side { position: fixed; right: 14px; top: 96px; width: 270px; max-height: calc(100vh - 110px); overflow: hidden; padding: 12px; font-size: 13px; background: var(--glass); border: 1px solid #ffffff22; border-radius: 16px; backdrop-filter: blur(6px); pointer-events: none; box-shadow: 0 6px 20px #0006; }
     #side h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; }
     #side h3.sub { margin-top: 12px; padding-top: 10px; border-top: 1px solid #ffffff1c; color: #f3dcb8; font-size: 12.5px; }
     #side h3 kbd { margin-left: auto; font-size: 11px; }
@@ -86,6 +86,18 @@
     .slip .seat { display: grid; place-items: center; min-width: 28px; height: 22px; padding: 0 5px; border-radius: 999px; color: #fff; background: var(--wood); font-size: 12px; flex: none; }
     .slip .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #0004; flex: none; }
     .slip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slip.order { display: block; padding: 5px 8px 6px; margin-bottom: 4px; }
+    .slip.order .top { display: flex; align-items: center; gap: 8px; }
+    .ings { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+    .ing { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 1px 3px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid #0003; background: #e4dcc6; color: #5a4a35; }
+    .ing.raw { background: #cfe2f5; color: #1f4a73; }
+    .ing.cooking { background: #ffd9a8; color: #8a4410; }
+    .ing.ready { background: #c4eccb; color: #1d6a33; }
+    .ing.cooked { background: #b5e6dc; color: #14594f; }
+    .ing.plated { opacity: .45; text-decoration: line-through; }
+    i.m { font-style: normal; padding: 0 5px; border-radius: 999px; font-size: 10px; color: #fff; background: #a5471b; }
+    i.m.boil { background: #2a6f97; }
+    i.m.fry { background: #9a7413; }
     .more, .dim { color: #bfa985; font-size: 12px; }
     .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
     .row span:last-child { text-align: right; }

@@ -2,10 +2,10 @@
 // 席のお客さん・入口の行列・コンロの料理・受け渡し台の料理・ドリンクバー・席の番号。
 
 import * as THREE from "three";
-import { type GameSnapshot } from "../shared/game";
-import { BARS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
+import { partIndex, partTicket, type GameSnapshot } from "../shared/game";
+import { BARS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
 import { METHOD_NAME } from "../shared/menu";
-import { makeDish, makeDrink } from "./items";
+import { makeDish, makeDrink, makeIngredient } from "./items";
 import { applyLook, bakePerson, buildPerson, lookFor, type Person } from "./people";
 
 function bubbleTexture(draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -65,7 +65,9 @@ function tagSprite(text: string, size: number, color = "#222"): THREE.Sprite {
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = "bold 36px sans-serif";
+  let px = 36;
+  ctx.font = `bold ${px}px sans-serif`;
+  while (ctx.measureText(text).width > 100 && px > 14) ctx.font = `bold ${(px -= 2)}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, 64, 34);
@@ -204,6 +206,12 @@ export class GameView {
       scene.add(tag);
     });
     BARS.forEach((s) => this.barSlot.push(new Slot(scene, 9.4, 1.06, s.z)));
+    const fridgeTag = tagSprite("冷蔵庫", 0.6, "#2f6f8f");
+    fridgeTag.position.set(FRIDGE.x, 2.3, FRIDGE.z + 0.6);
+    scene.add(fridgeTag);
+    const platingTag = tagSprite("盛り付け", 0.6, "#6a4a8a");
+    platingTag.position.set(PASS.kitchen.x, 1.75, PASS.kitchen.z + 0.9);
+    scene.add(platingTag);
     for (let i = 0; i < 8; i++) {
       const p = PASS_SLOT(i);
       this.passSlot.push(new Slot(scene, p.x, p.y - 0.01, p.z));
@@ -245,11 +253,28 @@ export class GameView {
 
     const byId = new Map(g.tickets.map((t) => [t.id, t]));
     g.stoves.forEach((id, i) => {
-      const t = id === null ? undefined : byId.get(id);
-      const cooking = t?.status === "cooking";
+      const part = id === null ? undefined : byId.get(partTicket(id))?.parts?.[partIndex(id)];
+      const cooking = part?.st === "cooking";
       const kind = STOVES[i]!.kind;
       const cookware = kind === "grill" ? pan : kind === "boil" ? pot : basket;
-      this.stoveSlot[i]!.set(!t ? "" : `${cooking ? "pan" : "dish"}${t.id}`, () => (cooking ? cookware() : makeDish(t!.item)));
+      this.stoveSlot[i]!.set(!part || id === null ? "" : `${id}${part.st}`, () => {
+        if (!part) return null;
+        const g2 = new THREE.Group();
+        if (cooking) {
+          g2.add(cookware());
+          const raw = makeIngredient(part.ing, false);
+          raw.scale.setScalar(0.8);
+          raw.position.y = 0.05;
+          g2.add(raw);
+        } else {
+          // できあがり。小皿にのせて置いてある
+          g2.add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.015, 20), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.25 })));
+          const done = makeIngredient(part.ing, true);
+          done.position.y = 0.012;
+          g2.add(done);
+        }
+        return g2;
+      });
       for (const m of this.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
     });
     g.bars.forEach((id, i) => {
