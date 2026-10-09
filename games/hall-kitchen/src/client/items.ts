@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { DISHES } from "../shared/menu";
+import { foodModel, type FoodModel, type Tint } from "./food";
 
 type DrinkShape = "glass" | "mug" | "wine" | "beer" | "sake";
 
@@ -87,6 +88,44 @@ const DRINK_LOOK: { shape: DrinkShape; color: number }[] = [
   { shape: "sake", color: 0xeef2f4 }, // 日本酒
 ];
 
+/**
+ * 食材ごとの3Dモデル(Kenney の Food Kit)。値は [生のモデル, 調理後のモデル, 大きさ(m), 生の色寄せ, 調理後の色寄せ]。
+ * ここにない食材(麺・豆腐・えび・いか・コロッケ・春巻きなど)は、このファイルのコードで作った形を使う。
+ * 順番は src/shared/menu.ts の INGREDIENTS と同じ(番号で引く)。
+ */
+type ModelSpec = [raw: FoodModel, cooked: FoodModel, size: number, rawTint?: Tint, cookedTint?: Tint];
+const ING_MODEL: Record<number, ModelSpec> = {
+  0: ["meat-patty", "meat-patty", 0.13, [0xe0707a, 0.55], undefined], // 合い挽き肉
+  1: ["meat-raw", "meat-cooked", 0.15], // 牛ステーキ肉
+  2: ["turkey", "turkey", 0.15, [0xf0b8a0, 0.5]], // 鶏もも肉
+  3: ["meat-ribs", "meat-ribs", 0.14, [0xf0a0a0, 0.45]], // 豚バラ肉
+  4: ["egg", "egg-cooked", 0.07], // 卵(焼くと目玉焼き)
+  5: ["onion", "onion-half", 0.08], // 玉ねぎ
+  6: ["paprika", "paprika", 0.08, [0x3f9a3a, 0.9], [0x2f7a2c, 0.9]], // ピーマン(緑に染める)
+  7: ["mushroom", "mushroom", 0.08], // しいたけ
+  8: ["rice-ball", "rice-ball", 0.09], // ごはん
+  9: ["bread", "bread", 0.12, undefined, [0xb06a2a, 0.35]], // 食パン(焼くと焼き色)
+  10: ["cheese-cut", "cheese-cut", 0.1], // チーズ
+  11: ["bacon-raw", "bacon", 0.13], // ベーコン
+  12: ["skewer", "skewer", 0.16, [0xf0b9a0, 0.4]], // 焼き鳥串
+  13: ["fish", "fish", 0.16, [0xff9a8a, 0.15], [0xe08a6a, 0.35]], // 鮭
+  14: ["eggplant", "eggplant", 0.1], // なす
+  15: ["dim-sum", "dim-sum", 0.1], // 餃子
+  19: ["carrot", "carrot", 0.15], // にんじん
+  20: ["broccoli", "broccoli", 0.1], // ブロッコリー
+  21: ["cabbage", "cabbage", 0.1, [0x2f7a35, 0.6], [0x2a6a30, 0.6]], // ほうれん草(葉物)
+  22: ["corn", "corn", 0.13], // トウモロコシ
+  23: ["pot-stew", "pot-stew", 0.16], // カレー(煮込み鍋)
+  24: ["meat-cooked", "meat-cooked", 0.13, undefined, [0x7a4a2a, 0.5]], // 煮豚(煮汁の色)
+  25: ["egg-half", "egg-half", 0.08, undefined, [0xc89a5a, 0.6]], // 煮卵
+  27: ["dim-sum", "dim-sum", 0.1, [0xe7c68a, 0.4]], // 焼売
+  28: ["fries", "fries", 0.11], // フライドポテト
+  30: ["meat-cooked", "meat-cooked", 0.13, [0xe9a7a0, 0.3], [0xc88a2f, 0.55]], // 豚ロース(衣をつけて揚げた色)
+  32: ["pumpkin-basic", "pumpkin-basic", 0.1], // かぼちゃ
+  33: ["fish", "fish", 0.16, [0xf2f0e8, 0.7], [0xd9a040, 0.6]], // 白身魚
+  37: ["leek", "leek", 0.15, [0x6aa83a, 0.5], [0x5a9a30, 0.5]], // アスパラ
+};
+
 const geoCache = new Map<string, THREE.BufferGeometry>();
 function geo(key: string, make: () => THREE.BufferGeometry): THREE.BufferGeometry {
   let g = geoCache.get(key);
@@ -115,7 +154,9 @@ const cyl = (rt: number, rb: number, h: number, seg = 24) => geo(`c${rt}.${rb}.$
 const sph = (r: number, ws = 16, hs = 12) => geo(`p${r}.${ws}.${hs}`, () => new THREE.SphereGeometry(r, ws, hs));
 
 function plateBase(g: THREE.Group, rough = 0.25) {
-  g.add(mesh(cyl(0.15, 0.1, 0.02), std(0xf6f6f2, rough)));
+  const plate = foodModel("plate", 0.32);
+  if (plate) g.add(plate);
+  else g.add(mesh(cyl(0.15, 0.1, 0.02), std(0xf6f6f2, rough)));
 }
 
 const box = (w: number, h: number, d: number) => geo(`b${w}.${h}.${d}`, () => new THREE.BoxGeometry(w, h, d));
@@ -124,7 +165,7 @@ const torus = (r: number, t: number) => geo(`t${r}.${t}`, () => new THREE.TorusG
 const capsule = (r: number, l: number) => geo(`cap${r}.${l}`, () => new THREE.CapsuleGeometry(r, l, 4, 10));
 
 /** 食材1つ。cooked=false は生、true は調理後。原点は底の中心、大きさはおよそ 0.12m */
-export function makeIngredient(i: number, cooked: boolean): THREE.Group {
+function proceduralIngredient(i: number, cooked: boolean): THREE.Group {
   const look = ING_LOOK[i % ING_LOOK.length]!;
   const color = cooked ? look.cooked : look.raw;
   const rough = cooked ? 0.65 : 0.4;
@@ -258,6 +299,19 @@ export function makeIngredient(i: number, cooked: boolean): THREE.Group {
       break;
   }
   return g;
+}
+
+/**
+ * 食材1つ。モデルがあるものはそれ、ないものはコードで作った形。cooked=false は生、true は調理後。
+ * 原点は底の中心、大きさはおよそ 0.12m。
+ */
+export function makeIngredient(i: number, cooked: boolean): THREE.Group {
+  const spec = ING_MODEL[i];
+  if (spec) {
+    const m = foodModel(cooked ? spec[1] : spec[0], spec[2], cooked ? spec[4] : spec[3]);
+    if (m) return m;
+  }
+  return proceduralIngredient(i, cooked);
 }
 
 /** 1皿。皿の上に、その料理の食材(調理後)を並べる */

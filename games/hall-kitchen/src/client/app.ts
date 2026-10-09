@@ -6,6 +6,7 @@ import { STOVES, nearestTarget, seatLabel } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
 import { animateWalk, buildPerson, lookFor, type Person } from "./people";
+import { preloadFood } from "./food";
 import { loadHdri } from "./hdri";
 import { loadModel, placeable } from "./models";
 import { buildRestaurant } from "./scene";
@@ -79,6 +80,12 @@ loadModel("models/glass-vase-flowers.glb")
     }
   })
   .catch((e) => console.warn("花瓶のモデルを読み込めませんでした", e));
+// 食材のモデル。読み込めたら、すでに作った料理や手元を作り直す
+preloadFood().then(() => {
+  view.invalidate();
+  hands.invalidate();
+  if (game) onGame(game);
+});
 const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 100);
 camera.rotation.order = "YXZ";
 const EYE = 1.6;

@@ -126,6 +126,9 @@ class Slot {
     this.group.position.set(x, y, z);
     parent.add(this.group);
   }
+  reset() {
+    this.key = "\0";
+  }
   set(key: string, make: () => THREE.Object3D | null) {
     if (key === this.key) return;
     this.key = key;
@@ -218,6 +221,11 @@ export class GameView {
       const p = PASS_SLOT(i);
       this.passSlot.push(new Slot(scene, p.x, p.y - 0.01, p.z));
     }
+  }
+
+  /** 素材(食材のモデル)が読み込めたときに、作り直してもらう */
+  invalidate(): void {
+    for (const slots of [this.tableDish, this.tableDrink, this.stoveSlot, this.barSlot, this.passSlot]) for (const s of slots) s.reset();
   }
 
   update(g: GameSnapshot): void {

@@ -66,14 +66,21 @@ npm run deploy      # Cloudflare に公開(Durable Objects を使う)
 URL に `?debug` を付けると、ブラウザのコンソールから `__debug.play(役割, x, z, yaw, 状態)` で、サーバーなしで任意のゲーム状態を表示できる(見た目の確認用。通常のプレイには影響しない)。
 
 ## 素材(外から取り込んだもの)
-基本は、形も質感もコードで作っている。次の2つだけ、配布されている素材を使っている(どちらも `public/assets/` に置いてある)。
+基本は、形も質感もコードで作っている。次の素材だけ、配布されているものを使っている(`public/assets/` に置いてある)。
 サーバー版・Artifact 版のどちらでも、相対パス `./assets/...` で読み込む。読み込めなくても、コードで作った簡単な形・環境で動く。
 
 | 素材 | 使いみち | 出どころ | ライセンス |
 |---|---|---|---|
 | `hdri/warehouse.hdr` | 金属(ステンレス)に映り込む室内の景色 | [Poly Haven](https://polyhaven.com/hdris) の HDRI を、[pmndrs/assets](https://github.com/pmndrs/assets) が小さくしたもの | CC0 |
 | `models/glass-vase-flowers.glb` | テーブルの花瓶 | [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) の Glass Vase with Flowers | CC0 |
+| `models/food/*.glb`(31個) | 食材と皿の3Dモデル | [Kenney](https://www.kenney.nl/) の Food Kit。[pmndrs/market-assets](https://github.com/pmndrs/market-assets) 経由で取得 | CC0 |
 
 使えなかった素材: Poly Haven・ambientCG・Quaternius・Kenney・Sketchfab は、この開発環境のネットワークから接続できなかった。
 人や食べ物の実物に近いモデル、ステンレスやタイルの写真の質感は、これらのサイトからでないと手に入りにくい。
 環境のネットワーク設定でこれらのドメインを許可すれば、取り込める。
+
+### 食材のモデル(`models/food`)
+- 元のモデルは Draco 圧縮で、材質が「光に反応しない(unlit)」だった。取り込むときに [gltf-transform](https://gltf-transform.dev/) で圧縮を展開し、読み込み時に光と影に反応する材質へ置き換えている(`src/client/food.ts`)。
+- 食材40種のうち29種にモデルを割り当てた(`src/client/items.ts` の `ING_MODEL`)。モデルがない11種(スパゲッティ・中華麺・豆腐・白米・から揚げ肉・えび・いか・コロッケ・春巻き・れんこん・チキンカツ)は、コードで作った形のまま。
+- 生と調理後で別のモデルがあるもの(肉・卵・ベーコン)はそれを使い、ないものは色を寄せて焼き色・衣・煮汁の違いを出している。
+- Kenney のモデルは、角ばった低ポリゴンの見た目。写真のような質感ではない。

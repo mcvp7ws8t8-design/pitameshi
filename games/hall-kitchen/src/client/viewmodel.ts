@@ -64,6 +64,11 @@ export class ViewModel {
     });
   }
 
+  /** 素材が読み込めたときに、作り直してもらう */
+  invalidate() {
+    this.key = "\0";
+  }
+
   /** 持っているものを台の上に並べる。変わったときだけ作り直す */
   setHeld(held: Held[]) {
     const key = held.map((h) => `${h.kind}${h.item}${h.cooked ? "c" : ""}`).join(",");
