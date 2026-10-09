@@ -7,6 +7,10 @@ const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
 const body = html.match(/<body>([\s\S]*?)<script type="module"/)?.[1];
 if (!css || !body) throw new Error("index.html から見た目を取り出せませんでした");
 const js = readFileSync("dist-artifact/app.js", "utf8").replaceAll("</script", "<\\/script");
+// 素材ファイルはページに添えて公開できない形式なので、base64 にして埋め込む(src/client/assets.ts が読む)
+const assets = Object.fromEntries(
+  ["hdri/warehouse.hdr", "models/glass-vase-flowers.glb"].map((f) => [f, readFileSync(`public/assets/${f}`).toString("base64")]),
+);
 
 const page = `<title>ホール&amp;キッチン</title>
 <style>
@@ -14,6 +18,9 @@ const page = `<title>ホール&amp;キッチン</title>
 ${css}
 </style>
 ${body.trim()}
+<script>
+window.__HK_ASSETS__ = ${JSON.stringify(assets)};
+</script>
 <script>
 ${js}
 </script>

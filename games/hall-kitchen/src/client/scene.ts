@@ -52,6 +52,8 @@ function cylinder(rt: number, rb: number, h: number, m: THREE.Material, x: numbe
 export interface Restaurant {
   scene: THREE.Scene;
   kitchen: Kitchen;
+  /** テーブルの花瓶(簡単な形)。本物のモデルが読み込めたら差し替える */
+  tableVases: THREE.Group[];
 }
 
 export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
@@ -143,6 +145,7 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   const glassVase = new THREE.MeshPhysicalMaterial({ color: 0xcfe8f5, roughness: 0.05, transparent: true, opacity: 0.55 });
   const lampShade = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.35, metalness: 0.85, side: THREE.DoubleSide });
   const lampBulb = new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb860, emissiveIntensity: 3 });
+  const tableVases: THREE.Group[] = [];
   TABLES.forEach((t) => {
     const { w, d } = TABLE_SIZE[t.seats];
     scene.add(box(w, 0.06, d, tableWood(w * 1.1, d * 1.1), t.x, 0.76, t.z, { round: 0.02 }));
@@ -152,12 +155,15 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
       scene.add(cylinder(0.06, 0.08, 0.73, metal, t.x + lx, 0.365, t.z));
       scene.add(cylinder(0.26, 0.28, 0.03, metal, t.x + lx, 0.015, t.z, 24));
     }
-    // 花瓶と調味料
-    scene.add(cylinder(0.03, 0.04, 0.12, glassVase, t.x - w * 0.3, 0.85, t.z, 14));
-    scene.add(cylinder(0.004, 0.004, 0.2, plain(0x3f7a3a, 0.8), t.x - w * 0.3, 0.96, t.z, 6));
+    // 花瓶(読み込みが終わるまでは簡単な形。終わったら本物のモデルに差し替える)と調味料
+    const vase = new THREE.Group();
+    vase.position.set(t.x - w * 0.3, 0.79, t.z);
+    vase.add(cylinder(0.03, 0.04, 0.12, glassVase, 0, 0.06, 0, 14), cylinder(0.004, 0.004, 0.2, plain(0x3f7a3a, 0.8), 0, 0.17, 0, 6));
     const flower = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), plain(0xd9486a, 0.7));
-    flower.position.set(t.x - w * 0.3, 1.07, t.z);
-    scene.add(flower);
+    flower.position.set(0, 0.28, 0);
+    vase.add(flower);
+    scene.add(vase);
+    tableVases.push(vase);
     scene.add(cylinder(0.016, 0.018, 0.055, plain(0xf4f1ea, 0.3), t.x + w * 0.28, 0.82, t.z, 10), cylinder(0.016, 0.018, 0.055, plain(0x2b2b2b, 0.3), t.x + w * 0.28 + 0.05, 0.82, t.z, 10));
     // 吊りランプ(見た目だけ。実際の光は下でまとめて置く)
     scene.add(cylinder(0.006, 0.006, H - 2.3, plain(0x222222, 0.5), t.x, (H + 2.3) / 2, t.z, 6));
@@ -275,5 +281,5 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
   scene.add(sun, sun.target);
 
   scene.fog = new THREE.Fog(0x15110e, 25, 45);
-  return { scene, kitchen };
+  return { scene, kitchen, tableVases };
 }

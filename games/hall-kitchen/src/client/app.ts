@@ -6,6 +6,8 @@ import { STOVES, nearestTarget, seatLabel } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
 import { animateWalk, buildPerson, lookFor, type Person } from "./people";
+import { loadHdri } from "./hdri";
+import { loadModel, placeable } from "./models";
 import { buildRestaurant } from "./scene";
 import { GameView } from "./view";
 import { ViewModel, type Held } from "./viewmodel";
@@ -43,9 +45,40 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.autoClear = false;
 document.body.prepend(renderer.domElement);
 
-const { scene, kitchen } = buildRestaurant(renderer);
+const { scene, kitchen, tableVases } = buildRestaurant(renderer);
 const view = new GameView(scene, kitchen);
 const hands = new ViewModel(scene.environment as THREE.Texture | null);
+// 反射の背景。金属(ステンレスなど)にだけ、実際の室内の景色を映す。
+// 壁や天井まで照らしてしまうと、背景画像の色が部屋全体に移ってしまうので、金属の反射だけに使う
+const hdriName = new URLSearchParams(location.search).get("env") ?? "warehouse";
+loadHdri(renderer, hdriName)
+  .then((env) => {
+    const apply = (root: THREE.Object3D, intensity: number) =>
+      root.traverse((o) => {
+        const mat = (o as THREE.Mesh).material;
+        for (const m of Array.isArray(mat) ? mat : mat ? [mat] : []) {
+          if (m instanceof THREE.MeshStandardMaterial && m.metalness > 0.5) {
+            m.envMap = env;
+            m.envMapIntensity = intensity;
+            m.needsUpdate = true;
+          }
+        }
+      });
+    apply(scene, 0.8);
+    apply(hands.scene, 0.6);
+  })
+  .catch((e) => console.warn("反射用の背景画像を読み込めませんでした", e));
+// テーブルの花瓶を、配布されている本物のモデル(CC0)に差し替える
+loadModel("models/glass-vase-flowers.glb")
+  .then((model) => {
+    for (const ph of tableVases) {
+      const vase = placeable(model, 0.3);
+      vase.position.copy(ph.position);
+      scene.add(vase);
+      ph.visible = false;
+    }
+  })
+  .catch((e) => console.warn("花瓶のモデルを読み込めませんでした", e));
 const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 100);
 camera.rotation.order = "YXZ";
 const EYE = 1.6;
@@ -414,6 +447,7 @@ $("kitchen").onclick = () => send({ t: "role", role: "kitchen" });
 if (new URLSearchParams(location.search).has("debug")) {
   Object.assign(window, {
     __debug: {
+      vasesSwapped: () => tableVases.every((v) => !v.visible),
       play(role: Role, x: number, z: number, yaw: number, g: GameSnapshot) {
         myRole = role;
         hands.setRole(role);
