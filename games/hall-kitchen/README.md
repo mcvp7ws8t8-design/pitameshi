@@ -26,6 +26,18 @@
 まだないもの: 皿の片付け・洗い物、声のやり取り(外部のツールで話す想定)。
 数字は `src/shared/game.ts` の `CONFIG` にまとめてある。まだ調整していない。
 
+## Claude の画面の中で遊ぶ(Artifact 版)
+サーバーを使わず、同じページを開いている人どうしを Claude の `room` 機能でつなぐ版。
+部屋を作った人のページがホスト(ゲームの進行を計算する)になり、入った人は操作を送って結果を受け取る。
+
+```
+npm run build:artifact   # dist-artifact/page.html ができる
+```
+できた `page.html` を Artifact として公開する。公開するときに、`room` 機能で次の4つの送信を「操作できる人なら送れる」にしておく:
+`{"room": {"topics": {"hk_cmd": "interact", "hk_s": "interact", "hk_g": "interact", "hk_i": "interact"}}}`
+遊ぶ相手には、Artifact の共有で「編集できる」以上の権限が必要(閲覧のみだと送信できない)。1人で試すときは、同じ Artifact を2つのタブで開く。
+通信の中身は `src/artifact/roomnet.ts`、見た目やルールはサーバー版と同じコードを使う。
+
 ## コマンド
 ```
 cd games/hall-kitchen
@@ -43,6 +55,7 @@ npm run deploy      # Cloudflare に公開(Durable Objects を使う)
 - `src/shared/layout.ts` 卓・椅子・調理場・ドリンクバー・受け渡し台の位置と、近くにあるものの判定
 - `src/shared/protocol.ts` 通信メッセージ
 - `src/server/index.ts` Worker と、1部屋 = 1つの Durable Object(WebSocket)
+- `src/artifact/` Claude の画面(Artifact)版の通信(room)と入口
 - `src/client/` Three.js の画面と操作。画像・3Dモデルのファイルは使わず、形と質感はすべてコードで作る
   - `scene.ts` 店(床・壁・窓・家具・キッチン設備・照明・日光の影) / `textures.ts` Canvas で描く質感
   - `people.ts` 人のモデル / `items.ts` 食材40種・料理(皿に食材を盛る)・ドリンク20種のモデル
