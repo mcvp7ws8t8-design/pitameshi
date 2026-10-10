@@ -646,6 +646,65 @@ dish('pancakes', 'パンケーキ', 'Pancakes', ['flour', 'egg', 'milk', 'butter
 });
 
 
+/* ================= 厨房の設備(「3Dキッチン」のアーティファクトから) ================= */
+const ST = 0xc5c9cc, DK = 0x232527;
+const S = (g, geo, p, o) => A(g, geo, ST, p, Object.assign({ rough: 0.35, metal: 0.85 }, o || {}));
+const EQUIP = {};
+const prop = (id, _name, _en, _cat, fn) => { EQUIP[id] = fn; };
+function cabinet(g, w) {
+  S(g, box(w, .78, .65), [0, .47, 0]); A(g, box(w - .04, .08, .55), DK, [0, .04, 0]);
+  const n = Math.max(1, Math.round(w / .6)), dw = w / n;
+  for (let i = 0; i < n; i++) { const x = -w / 2 + dw * (i + .5); S(g, box(dw - .02, .7, .016), [x, .47, .333], { rough: 0.3 }); S(g, box(dw * .5, .018, .03), [x, .76, .355], { rough: 0.22 }); }
+}
+prop('counter', '調理台', 'Counter', '設備', g => { cabinet(g, 1.2); S(g, box(1.21, .04, .7), [0, .88, .01], { rough: 0.28 }); });
+prop('sink', 'シンク', 'Sink', '設備', g => {
+  cabinet(g, 1.2);
+  S(g, box(.255, .04, .7), [-.4775, .88, .01]); S(g, box(.355, .04, .7), [.4275, .88, .01]); S(g, box(.6, .04, .14), [-.05, .88, -.27]); S(g, box(.6, .04, .16), [-.05, .88, .28]);
+  const o = { rough: 0.5 };
+  S(g, box(.6, .01, .4), [-.05, .7, 0], o); S(g, box(.6, .2, .01), [-.05, .8, -.2], o); S(g, box(.6, .2, .01), [-.05, .8, .2], o); S(g, box(.01, .2, .4), [-.35, .8, 0], o); S(g, box(.01, .2, .4), [.25, .8, 0], o);
+  A(g, cyl(.025, .025, .006, 16), DK, [-.05, .708, 0]);
+  S(g, cyl(.018, .024, .06, 14), [-.05, .93, -.27]);
+  S(g, tube([[-.05, .94, -.27], [-.05, 1.2, -.27], [-.05, 1.27, -.2], [-.05, 1.22, -.11], [-.05, 1.15, -.09]], .012, 40, 10));
+  [-.16, .06].forEach(x => { S(g, cyl(.014, .018, .04, 12), [x, .92, -.27]); S(g, box(.07, .012, .02), [x, .95, -.25]); });
+});
+prop('stove', 'コンロ', 'Stove', '設備', g => {
+  S(g, box(1.0, .8, .7), [0, .46, 0]); [-1, 1].forEach(x => [-1, 1].forEach(z => A(g, cyl(.025, .025, .06, 10), DK, [x * .44, .03, z * .29])));
+  A(g, box(1.0, .03, .7), 0x1c1c1e, [0, .875, 0], { rough: 0.4 });
+  [-.25, .25].forEach(x => [-.16, .17].forEach(z => {
+    A(g, cyl(.035, .042, .014, 16), 0x3a3a3c, [x, .897, z], { metal: 0.5, rough: 0.4 });
+    A(g, new T.TorusGeometry(.09, .008, 6, 24), DK, [x, .908, z], { r: [PI / 2, 0, 0], rough: 0.5 });
+    A(g, box(.24, .012, .016), DK, [x, .908, z]); A(g, box(.016, .012, .24), DK, [x, .908, z]);
+  }));
+  S(g, box(1.0, .1, .02), [0, .8, .355], { rough: 0.3 });
+  for (let i = 0; i < 5; i++) A(g, cyl(.024, .028, .03, 14), DK, [-.36 + i * .18, .8, .38], { r: [PI / 2, 0, 0] });
+  S(g, box(.9, .52, .02), [0, .42, .355], { rough: 0.3 }); A(g, box(.6, .26, .006), 0x0e0f10, [0, .43, .367], { rough: 0.08 });
+  S(g, cyl(.012, .012, .8, 10), [0, .7, .395], { r: [0, 0, PI / 2], rough: 0.2 }); [-.38, .38].forEach(x => S(g, box(.02, .02, .04), [x, .7, .375]));
+});
+prop('hood', 'レンジフード', 'Range hood', '設備', g => {
+  S(g, cyl(.3, .62, .3, 4), [0, .15, 0], { r: [0, PI / 4, 0], s: [1.15, 1, .78] }); S(g, box(.3, .7, .26), [0, .65, 0]);
+  A(g, box(.82, .012, .52), DK, [0, .004, 0]);
+});
+prop('fridge', '冷蔵庫', 'Fridge', '設備', g => {
+  S(g, box(.8, 1.86, .7), [0, .97, 0]); A(g, box(.76, .04, .6), DK, [0, .02, 0]);
+  S(g, box(.78, 1.18, .02), [0, 1.3, .36], { rough: 0.28 }); S(g, box(.78, .62, .02), [0, .37, .36], { rough: 0.28 });
+  S(g, cyl(.012, .012, .5, 10), [-.3, 1.1, .4], { rough: 0.2 }); S(g, cyl(.012, .012, .3, 10), [-.3, .5, .4], { rough: 0.2 });
+  [[1.33, .02], [.87, .02], [.62, .02], [.38, .02]].forEach(p => S(g, box(.03, .02, .04), [-.3, p[0], .385]));
+});
+prop('prep_table', '作業台', 'Prep table', '設備', g => {
+  const w = 2.2, d = .8; S(g, box(w, .04, d), [0, .88, 0], { rough: 0.28 }); S(g, box(w - .1, .02, d - .1), [0, .25, 0]);
+  [-1, 1].forEach(x => [-1, 1].forEach(z => { S(g, cyl(.022, .022, .86, 12), [x * (w / 2 - .05), .43, z * (d / 2 - .05)]); A(g, cyl(.028, .028, .02, 12), DK, [x * (w / 2 - .05), .01, z * (d / 2 - .05)]); }));
+});
+prop('hanging_rack', '吊り棚', 'Hanging rack', '設備', g => {
+  const w = 2.0; [-1, 1].forEach(x => [-1, 1].forEach(z => S(g, box(.035, .86, .035), [x * (w / 2 - .02), .43, z * .16])));
+  S(g, box(w, .03, .4), [0, .875, 0], { rough: 0.3 }); S(g, cyl(.009, .009, w - .08, 8), [0, .78, .19], { r: [0, 0, PI / 2] });
+  [-1, 1].forEach(x => S(g, box(.02, .1, .02), [x * (w / 2 - .04), .83, .19]));
+  for (let i = 0; i < 7; i++) S(g, new T.TorusGeometry(.016, .003, 6, 12, PI * 1.3), [-.75 + i * .25, .764, .19], { r: [0, PI / 2, -.4] });
+});
+prop('wall_shelf', '壁棚', 'Wall shelf', '設備', g => {
+  S(g, box(1.1, .02, .25), [0, .2, 0], { rough: 0.3 });
+  [-.45, .45].forEach(x => { S(g, box(.02, .2, .02), [x, .1, -.115]); S(g, box(.02, .02, .22), [x, .18, 0]); S(g, box(.02, .26, .02), [x, .095, -.02], { r: [.9, 0, 0] }); });
+});
+
 /* ---------- bake: 材質ごとに1つのメッシュ、原点は底の中心 ---------- */
 function bake(g) {
   g.updateMatrixWorld(true);
@@ -692,6 +751,23 @@ export function zukanBuild(kind: "ingredient" | "dish", id: string): THREE.Group
     item.fn(g);
     o = bake(g);
     built.set(key, o);
+  }
+  return o;
+}
+
+const builtEquip = new Map();
+
+/** 設備のモデル(counter / sink / stove / hood / fridge / prep_table / hanging_rack / wall_shelf)。原点は底の中心、単位はm。前(客側)が +z */
+export function zukanEquipment(id: string): THREE.Group | null {
+  let o = builtEquip.get(id);
+  if (!o) {
+    const fn = EQUIP[id];
+    if (!fn) return null;
+    seed = 9001 + Object.keys(EQUIP).indexOf(id) * 31;
+    const g = new T.Group();
+    fn(g);
+    o = bake(g);
+    builtEquip.set(id, o);
   }
   return o;
 }
