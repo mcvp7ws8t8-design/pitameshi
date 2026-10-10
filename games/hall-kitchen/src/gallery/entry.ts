@@ -6,7 +6,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { DISHES, DRINKS, INGREDIENTS, METHOD_NAME } from "../shared/menu";
 import { preloadFood } from "../client/food";
-import { drinkHasModel, ingredientHasModel, makeDish, makeDrink, makeIngredient } from "../client/items";
+import { dishHasModel, drinkHasModel, ingredientHasModel, makeDish, makeDrink, makeIngredient } from "../client/items";
 
 type Tab = "raw" | "cooked" | "dish" | "drink";
 
@@ -61,7 +61,7 @@ interface Entry {
 const entries: Record<Tab, () => Entry[]> = {
   raw: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${METHOD_NAME[x.method]}・${x.cook}秒`, model: ingredientHasModel(i), make: () => makeIngredient(i, false), scale: 3.0 })),
   cooked: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${METHOD_NAME[x.method]}・${x.cook}秒`, model: ingredientHasModel(i), make: () => makeIngredient(i, true), scale: 3.0 })),
-  dish: () => DISHES.map((d, i) => ({ name: d.name, sub: d.parts.map((p) => INGREDIENTS[p]!.name).join("・"), model: d.parts.every((p) => ingredientHasModel(p)), make: () => makeDish(i), scale: 1.9 })),
+  dish: () => DISHES.map((d, i) => ({ name: d.name, sub: d.parts.map((p) => INGREDIENTS[p]!.name).join("・"), model: dishHasModel(i) || d.parts.every((p) => ingredientHasModel(p)), make: () => makeDish(i), scale: 1.9 })),
   drink: () => DRINKS.map((d, i) => ({ name: d.name, sub: `作る${d.make}秒`, model: drinkHasModel(i), make: () => makeDrink(i), scale: 2.8 })),
 };
 

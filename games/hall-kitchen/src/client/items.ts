@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { DISHES } from "../shared/menu";
 import { foodModel, type FoodModel, type Tint } from "./food";
+import { zukanBuild } from "./zukan";
 
 type DrinkShape = "glass" | "mug" | "wine" | "beer" | "sake";
 
@@ -124,6 +125,50 @@ const ING_MODEL: Record<number, ModelSpec> = {
   32: ["pumpkin-basic", "pumpkin-basic", 0.1], // かぼちゃ
   33: ["fish", "fish", 0.16, [0xf2f0e8, 0.7], [0xd9a040, 0.6]], // 白身魚
   37: ["leek", "leek", 0.15, [0x6aa83a, 0.5], [0x5a9a30, 0.5]], // アスパラ
+};
+
+/**
+ * 図鑑(zukan.ts)の細かい形を使う食材。値は [図鑑の id, 大きさ(m), 調理後の色寄せ]。調理後の色寄せが null のものは、
+ * 調理後だけ上の ING_MODEL(目玉焼きなど)を使う。ここにあるものは ING_MODEL より優先する。順番は INGREDIENTS と同じ。
+ */
+type ZukanIng = [id: string, size: number, cooked: Tint | null | undefined];
+const ZUKAN_ING: Record<number, ZukanIng> = {
+  0: ["ground_meat", 0.13, [0x6b3a22, 0.5]], // 合い挽き肉
+  1: ["beef", 0.15, [0x5a3020, 0.55]], // 牛ステーキ肉
+  2: ["chicken", 0.14, [0xc98a3c, 0.45]], // 鶏もも肉
+  3: ["pork", 0.14, [0xc2864a, 0.4]], // 豚バラ肉
+  4: ["egg", 0.07, null], // 卵(焼くと目玉焼き)
+  5: ["onion", 0.08, [0xc98d3d, 0.35]], // 玉ねぎ
+  6: ["green_pepper", 0.09, [0x2f7a2c, 0.2]], // ピーマン
+  8: ["rice", 0.11, [0xe2c47e, 0.18]], // ごはん
+  9: ["bread", 0.11, [0xc88a3a, 0.4]], // 食パン
+  10: ["cheese", 0.1, [0xf0b030, 0.15]], // チーズ
+  11: ["bacon", 0.14, [0xa8452e, 0.35]], // ベーコン
+  13: ["salmon", 0.14, [0xe0715a, 0.3]], // 鮭
+  14: ["eggplant", 0.11, [0x3f2a4a, 0.2]], // なす
+  16: ["pasta", 0.13, [0xf0d77a, 0.12]], // スパゲッティ
+  17: ["chinese_noodles", 0.12, undefined], // 中華麺
+  18: ["tofu", 0.1, undefined], // 豆腐
+  19: ["carrot", 0.14, undefined], // にんじん
+  26: ["rice", 0.11, undefined], // 白米
+  30: ["pork", 0.14, [0xc88a2f, 0.55]], // 豚ロース(衣をつけて揚げた色)
+  31: ["shrimp", 0.12, [0xe0602a, 0.5]], // えび
+};
+
+/** 図鑑の料理をそのまま皿ごと使う料理。値は図鑑の id。順番は DISHES と同じ */
+const ZUKAN_DISH: Record<number, string> = {
+  1: "salad", // 温野菜サラダ(図鑑のサラダは生野菜。いちばん近い形)
+  2: "onigiri", // 焼きおにぎり
+  4: "sandwich", // ホットサンド
+  6: "gyoza", // 点心盛り合わせ(餃子)
+  8: "curry_rice", // コロッケカレー(コロッケは付かない)
+  9: "napolitan", // ナポリタン
+  11: "hamburg_steak", // ハンバーグ定食
+  12: "omurice", // オムライス
+  14: "ramen", // ラーメン
+  15: "tonkatsu", // とんかつ定食
+  16: "tempura", // 天ぷら盛り合わせ
+  17: "steak", // ステーキ
 };
 
 /**
@@ -329,11 +374,51 @@ function proceduralIngredient(i: number, cooked: boolean): THREE.Group {
   return g;
 }
 
+/** 皿ごと使う図鑑の料理の、横幅(m)。ゲームの皿(直径およそ 0.3m)に合わせる */
+const DISH_SIZE = 0.3;
+
+const zukanTinted = new Map<string, THREE.Group>();
+
+/** 図鑑のモデルを、横幅(皿は直径・食材は最大の辺)が size(m)になる大きさで返す。tint を渡すと、材質の色をそれへ寄せる */
+function zukanModel(kind: "ingredient" | "dish", id: string, size: number, tint?: Tint): THREE.Group | null {
+  const base = zukanBuild(kind, id);
+  if (!base) return null;
+  const key = `${kind}:${id}:${tint ? `${tint[0]}.${tint[1]}` : ""}`;
+  let tpl = zukanTinted.get(key);
+  if (!tpl) {
+    tpl = base.clone(true);
+    if (tint) {
+      const c = new THREE.Color(tint[0]);
+      tpl.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mm = (mesh.material as THREE.MeshStandardMaterial).clone();
+        mm.color.lerp(c, tint[1]);
+        mesh.material = mm;
+      });
+    }
+    zukanTinted.set(key, tpl);
+  }
+  const box = new THREE.Box3().setFromObject(tpl);
+  const dim = box.getSize(new THREE.Vector3());
+  const k = size / (kind === "dish" ? Math.max(dim.x, dim.z) : Math.max(dim.x, dim.y, dim.z));
+  const inst = tpl.clone(true);
+  inst.scale.setScalar(k);
+  const wrap = new THREE.Group();
+  wrap.add(inst);
+  return wrap;
+}
+
 /**
  * 食材1つ。モデルがあるものはそれ、ないものはコードで作った形。cooked=false は生、true は調理後。
  * 原点は底の中心、大きさはおよそ 0.12m。
  */
 export function makeIngredient(i: number, cooked: boolean): THREE.Group {
+  const z = ZUKAN_ING[i];
+  if (z && !(cooked && z[2] === null)) {
+    const m = zukanModel("ingredient", z[0], z[1], cooked ? (z[2] ?? undefined) : undefined);
+    if (m) return m;
+  }
   const spec = ING_MODEL[i];
   if (spec) {
     const m = foodModel(cooked ? spec[1] : spec[0], spec[2], cooked ? spec[4] : spec[3]);
@@ -344,6 +429,11 @@ export function makeIngredient(i: number, cooked: boolean): THREE.Group {
 
 /** 1皿。皿の上に、その料理の食材(調理後)を並べる */
 export function makeDish(i: number): THREE.Group {
+  const zd = ZUKAN_DISH[i % DISHES.length];
+  if (zd) {
+    const m = zukanModel("dish", zd, DISH_SIZE);
+    if (m) return m;
+  }
   const dish = DISHES[i % DISHES.length]!;
   const g = new THREE.Group();
   plateBase(g);
@@ -429,5 +519,7 @@ export const drinkColorCss = (i: number): string => hex(DRINK_LOOK[i % DRINK_LOO
 export const dishColorHex = (i: number): number => ING_LOOK[DISHES[i % DISHES.length]!.parts[0]! % ING_LOOK.length]!.cooked;
 
 /** 図鑑用: 食材・ドリンクの形が、配布モデルか、コードで作ったものか(モデルが読み込めているときの話) */
-export const ingredientHasModel = (i: number): boolean => ING_MODEL[i] !== undefined;
+export const ingredientHasModel = (i: number): boolean => ING_MODEL[i] !== undefined || ZUKAN_ING[i] !== undefined;
+/** 図鑑用: 皿ごと作り込んだ料理か */
+export const dishHasModel = (i: number): boolean => ZUKAN_DISH[i % DISHES.length] !== undefined;
 export const drinkHasModel = (i: number): boolean => DRINK_MODEL[i % DRINK_MODEL.length] !== undefined;
