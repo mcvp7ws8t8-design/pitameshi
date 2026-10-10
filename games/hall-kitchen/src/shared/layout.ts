@@ -62,6 +62,9 @@ export const STOVES: Station[] = [
   ...[-2.8, -4.3, -5.8, -7.3].map((z) => ({ x: -9.0, z, kind: "boil" as const })),
 ];
 
+// まな板(キッチン側の右の壁の作業台)。3枚で、生の食材を切る。
+export const CUTS: Spot[] = [-4.0, -4.8, -5.6].map((z) => ({ x: 8.8, z }));
+
 // ドリンクバー(ホール側の右の壁)。2台で、ホールが飲み物を作る。
 export const BARS: Spot[] = [
   { x: 8.8, z: 1.6 },
@@ -79,9 +82,9 @@ export const PASS: Record<Role, Spot> = {
 /** 受け渡し台に置いた料理を並べる位置(表示用) */
 export const PASS_SLOT = (i: number): Spot & { y: number } => ({ x: -1.15 + i * 0.33, z: -0.5, y: 1.1 });
 
-export const RADIUS = { seat: 1.5, stove: 1.7, pass: 1.8, bar: 1.6, fridge: 1.9 };
+export const RADIUS = { seat: 1.5, stove: 1.7, pass: 1.8, bar: 1.6, fridge: 1.9, board: 1.0 };
 
-export type Target = { kind: "seat" | "stove" | "bar" | "fridge" | "pass"; i: number };
+export type Target = { kind: "seat" | "stove" | "board" | "bar" | "fridge" | "pass"; i: number };
 
 /** 役割ごとに、いまの位置から触れる一番近いものを返す */
 export function nearestTarget(role: Role, x: number, z: number): Target | null {
@@ -91,6 +94,7 @@ export function nearestTarget(role: Role, x: number, z: number): Target | null {
     BARS.forEach((s, i) => cands.push({ t: { kind: "bar", i }, spot: s, r: RADIUS.bar }));
   } else {
     STOVES.forEach((s, i) => cands.push({ t: { kind: "stove", i }, spot: s, r: RADIUS.stove }));
+    CUTS.forEach((s, i) => cands.push({ t: { kind: "board", i }, spot: s, r: RADIUS.board }));
     cands.push({ t: { kind: "fridge", i: 0 }, spot: FRIDGE, r: RADIUS.fridge });
   }
   cands.push({ t: { kind: "pass", i: 0 }, spot: PASS[role], r: RADIUS.pass });

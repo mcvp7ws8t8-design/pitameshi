@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
 import { CONFIG, partIndex, partTicket, type GameSnapshot, type PartState, type TicketSnapshot } from "../shared/game";
-import { METHOD_NAME, PREP_NAME, dishName, drinkName, ingredientName, methodOfIngredient, type Method } from "../shared/menu";
+import { METHOD_NAME, PREP_NAME, dishName, drinkName, ingredientName, methodOfIngredient, needsCut, type Method } from "../shared/menu";
 import { STOVES, nearestTarget, seatLabel } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
@@ -234,14 +234,25 @@ const itemName = (t: TicketSnapshot) => (t.kind === "food" ? dishName(t.item) : 
 const itemColor = (t: TicketSnapshot) => (t.kind === "food" ? dishColorCss(t.item) : drinkColorCss(t.item));
 
 /** キッチンが手に持っている食材(生のものと調理済みのもの) */
-function heldParts(g: GameSnapshot): { t: TicketSnapshot; ing: number; st: PartState }[] {
+function heldParts(g: GameSnapshot): { t: TicketSnapshot; ing: number; st: PartState; cut: boolean }[] {
   return g.tickets
-    .flatMap((t) => (t.parts ?? []).map((p) => ({ t, ing: p.ing, st: p.st })))
+    .flatMap((t) => (t.parts ?? []).map((p) => ({ t, ing: p.ing, st: p.st, cut: p.cut })))
     .filter((h) => h.st === "raw" || h.st === "cooked");
 }
 
-const STATE_LABEL: Record<PartState, string> = { need: "未", raw: "持", cooking: "調理中", ready: "できた", cooked: "調理済", plated: "済" };
-const methodTag = (ing: number) => `<i class="m ${methodOfIngredient(ing)}">${PREP_NAME[methodOfIngredient(ing)]}</i>`;
+const STATE_LABEL: Record<PartState, string> = { need: "未", raw: "持", chopping: "切り中", chopped: "切った", cooking: "調理中", ready: "できた", cooked: "調理済", plated: "済" };
+// 食材のタグ。切る食材は「切る」が前に付く(切ってから、焼く・茹でる・揚げる。そのままのものは切って完成)
+const methodTag = (ing: number) => {
+  const m = methodOfIngredient(ing);
+  const cut = needsCut(ing) ? `<i class="m cut">切る</i>` : "";
+  return m === "none" && cut ? cut : `${cut}<i class="m ${m}">${PREP_NAME[m]}</i>`;
+};
+
+/** 手に持っている食材の状態の一言 */
+function heldLabel(h: { ing: number; st: PartState; cut: boolean }): string {
+  if (h.st === "cooked") return methodOfIngredient(h.ing) === "none" ? (needsCut(h.ing) ? "切った" : "そのまま") : "調理済";
+  return needsCut(h.ing) && !h.cut ? "生(切る前)" : needsCut(h.ing) ? "切った" : "生";
+}
 
 function onGame(g: GameSnapshot) {
   const prev = game;
@@ -259,7 +270,7 @@ function onGame(g: GameSnapshot) {
     `<div class="stat"><small>行列</small><b>${g.queue}<span>人</span></b></div>`;
   renderSide(g);
   renderCenter(g);
-  hands.setHeld(myRole === "kitchen" ? heldParts(g).map((h) => ({ kind: "ing" as const, item: h.ing, cooked: h.st === "cooked" })) : g.tickets
+  hands.setHeld(myRole === "kitchen" ? heldParts(g).map((h) => ({ kind: "ing" as const, item: h.ing, cooked: h.st === "cooked", cut: h.cut })) : g.tickets
     .filter((t) => t.status === "hall")
     .sort((a, b) => a.id - b.id)
     .map((t): Held => ({ kind: t.kind, item: t.item })));
@@ -330,10 +341,14 @@ function renderKitchenSide(g: GameSnapshot) {
     const ready = parts.filter((p) => p?.st === "ready").length;
     html += `<div class="row"><span>${METHOD_NAME[m]} <span class="dim">${ids.length}台</span></span><span>作成中 ${busy}${ready ? ` <em class="ready">できた ${ready}</em>` : ""} / 空き ${ids.length - busy - ready}</span></div>`;
   }
+  const boardParts = g.boards.map((id) => (id === null ? undefined : g.tickets.find((x) => x.id === partTicket(id))?.parts?.[partIndex(id)]));
+  const chopping = boardParts.filter((p) => p?.st === "chopping").length;
+  const chopped = boardParts.filter((p) => p?.st === "chopped").length;
+  html += `<div class="row"><span>切る <span class="dim">${g.boards.length}枚</span></span><span>切り中 ${chopping}${chopped ? ` <em class="ready">切れた ${chopped}</em>` : ""} / 空き ${g.boards.length - chopping - chopped}</span></div>`;
   const held = heldParts(g);
   html += `<h3 class="sub">手 <span class="count">${held.length}/${CONFIG.holdKitchen}</span></h3>`;
   html += held.length
-    ? held.map((h) => `<div class="row"><span>${seatLabel(h.t.seat)} ${ingredientName(h.ing)}</span><span>${methodTag(h.ing)}<em class="${h.st === "cooked" ? "ready" : "busy"}">${h.st === "cooked" ? "調理済" : "生"}</em></span></div>`).join("")
+    ? held.map((h) => `<div class="row"><span>${seatLabel(h.t.seat)} ${ingredientName(h.ing)}</span><span>${methodTag(h.ing)}<em class="${h.st === "cooked" || (h.cut && needsCut(h.ing)) ? "ready" : "busy"}">${heldLabel(h)}</em></span></div>`).join("")
     : `<div class="dim">なし</div>`;
   $("side").innerHTML = html;
 }
@@ -377,14 +392,24 @@ function promptText(): string {
     const t = orders.find((x) => x.id === game!.selFood) ?? orders[0];
     return t ? `E|${seatLabel(t.seat)} ${dishName(t.item)}の食材を取る` : "|取る食材がありません";
   }
+  if (target.kind === "board") {
+    const id = game.boards[target.i];
+    const part = id === null || id === undefined ? undefined : tickets.find((x) => x.id === partTicket(id))?.parts?.[partIndex(id)];
+    if (part) return part.st === "chopped" ? `E|${ingredientName(part.ing)}を取る` : "|切っている最中";
+    const raws = heldParts(game).filter((h) => h.st === "raw" && !h.cut);
+    const next = raws.find((h) => h.t.id === game!.selFood) ?? raws[0];
+    if (next) return `E|${ingredientName(next.ing)}を切る`;
+    return heldParts(game).length ? "|切る食材がありません" : "|食材を持っていません";
+  }
   if (target.kind === "stove") {
     const station = STOVES[target.i]!;
     const id = game.stoves[target.i];
     const part = id === null || id === undefined ? undefined : tickets.find((x) => x.id === partTicket(id))?.parts?.[partIndex(id)];
     if (part) return part.st === "ready" ? `E|${ingredientName(part.ing)}を取る` : `|${METHOD_NAME[station.kind]}の最中`;
     const raws = heldParts(game).filter((h) => h.st === "raw");
-    const fit = raws.find((h) => methodOfIngredient(h.ing) === station.kind);
+    const fit = raws.find((h) => methodOfIngredient(h.ing) === station.kind && h.cut);
     if (fit) return `E|${ingredientName(fit.ing)}を${METHOD_NAME[station.kind]}で作る`;
+    if (raws.some((h) => methodOfIngredient(h.ing) === station.kind && !h.cut)) return "|先にまな板で切ってください";
     return raws.length ? `|${METHOD_NAME[station.kind]}で作れる食材がありません` : "|食材を持っていません";
   }
   if (myRole === "hall") return tickets.some((t) => t.status === "pass") ? "E|受け渡し台から料理を取る" : "";

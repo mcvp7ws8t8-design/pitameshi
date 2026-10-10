@@ -3,7 +3,7 @@
 
 import * as THREE from "three";
 import { partIndex, partTicket, type GameSnapshot } from "../shared/game";
-import { BARS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
+import { BARS, CUTS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
 import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink, makeIngredient } from "./items";
 import { dishColorHex } from "./items";
@@ -151,6 +151,7 @@ export class GameView {
   private tableDrink: Slot[] = [];
   private queue: THREE.Group[] = [];
   private stoveSlot: Slot[] = [];
+  private boardSlot: Slot[] = [];
   private barSlot: Slot[] = [];
   private passSlot: Slot[] = [];
 
@@ -214,6 +215,12 @@ export class GameView {
       tag.position.set(s.x, 1.6, s.z);
       scene.add(tag);
     });
+    CUTS.forEach((s, i) => {
+      this.boardSlot.push(new Slot(scene, 9.3, 0.95, s.z));
+      const tag = tagSprite(`切る${i + 1}`, 0.4, "#6b7a2a");
+      tag.position.set(9.3, 1.35, s.z);
+      scene.add(tag);
+    });
     BARS.forEach((s) => this.barSlot.push(new Slot(scene, 9.4, 1.06, s.z)));
     const fridgeTag = tagSprite("冷蔵庫", 0.6, "#2f6f8f");
     fridgeTag.position.set(FRIDGE.x, 2.3, FRIDGE.z + 0.6);
@@ -253,7 +260,7 @@ export class GameView {
 
   /** 素材(食材のモデル)が読み込めたときに、作り直してもらう */
   invalidate(): void {
-    for (const slots of [this.tableDish, this.tableDrink, this.stoveSlot, this.barSlot, this.passSlot]) for (const s of slots) s.reset();
+    for (const slots of [this.tableDish, this.tableDrink, this.stoveSlot, this.boardSlot, this.barSlot, this.passSlot]) for (const s of slots) s.reset();
   }
 
   update(g: GameSnapshot): void {
@@ -308,14 +315,14 @@ export class GameView {
         const g2 = new THREE.Group();
         if (cooking) {
           g2.add(cookware());
-          const raw = makeIngredient(part.ing, false);
+          const raw = makeIngredient(part.ing, false, true);
           raw.scale.setScalar(0.8);
           raw.position.y = 0.05;
           g2.add(raw);
         } else {
           // できあがり。小皿にのせて置いてある
           g2.add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.015, 20), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.25 })));
-          const done = makeIngredient(part.ing, true);
+          const done = makeIngredient(part.ing, true, true);
           done.position.y = 0.012;
           g2.add(done);
         }
@@ -323,6 +330,14 @@ export class GameView {
       });
       for (const m of this.kitchen.burners[i] ?? []) m.emissiveIntensity = cooking ? 1.6 : 0;
       this.effects.setStation(i, cooking);
+    });
+    g.boards.forEach((id, i) => {
+      const part = id === null ? undefined : byId.get(partTicket(id))?.parts?.[partIndex(id)];
+      this.boardSlot[i]!.set(!part || id === null ? "" : `${id}${part.st}`, () => {
+        if (!part) return null;
+        // 切っている間は丸ごと、切り終わると小さく切った形
+        return makeIngredient(part.ing, false, part.st === "chopped");
+      });
     });
     g.bars.forEach((id, i) => {
       const t = id === null ? undefined : byId.get(id);

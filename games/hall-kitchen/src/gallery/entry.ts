@@ -59,8 +59,8 @@ interface Entry {
 }
 
 const entries: Record<Tab, () => Entry[]> = {
-  raw: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${x.cook ? `${PREP_NAME[x.method]}・${x.cook}秒` : PREP_NAME[x.method]}`, model: true, make: () => makeIngredient(i, false), scale: 3.0 })),
-  cooked: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${x.cook ? `${PREP_NAME[x.method]}・${x.cook}秒` : PREP_NAME[x.method]}`, model: true, make: () => makeIngredient(i, true), scale: 3.0 })),
+  raw: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${x.cut ? "切る→" : ""}${x.cook ? `${PREP_NAME[x.method]}・${x.cook}秒` : x.cut ? "" : PREP_NAME[x.method]}`, model: true, make: () => makeIngredient(i, false), scale: 3.0 })),
+  cooked: () => INGREDIENTS.map((x, i) => ({ name: x.name, sub: `${x.cut ? "切る→" : ""}${x.cook ? `${PREP_NAME[x.method]}・${x.cook}秒` : x.cut ? "" : PREP_NAME[x.method]}`, model: true, make: () => makeIngredient(i, true), scale: 3.0 })),
   dish: () => DISHES.map((d, i) => ({ name: d.name, sub: d.parts.map((p) => INGREDIENTS[p]!.name).join("・"), model: true, make: () => makeDish(i), scale: 1.9 })),
   drink: () => DRINKS.map((d, i) => ({ name: d.name, sub: `作る${d.make}秒`, model: drinkHasModel(i), make: () => makeDrink(i), scale: 2.8 })),
 };

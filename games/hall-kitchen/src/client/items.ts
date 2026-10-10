@@ -2,7 +2,7 @@
 // ドリンクは Kenney の Food Kit(CC0)。原点は底の中心。皿は直径およそ 0.3m。
 
 import * as THREE from "three";
-import { DISHES, INGREDIENTS } from "../shared/menu";
+import { DISHES, INGREDIENTS, needsCut } from "../shared/menu";
 import { foodModel, type FoodModel, type Tint } from "./food";
 import { zukanBuild } from "./zukan";
 
@@ -98,10 +98,20 @@ function zukanModel(kind: "ingredient" | "dish", id: string, size: number, tint?
   return wrap;
 }
 
-/** 食材1つ。cooked=false は生、true は調理後。原点は底の中心 */
-export function makeIngredient(i: number, cooked: boolean): THREE.Group {
+/** 食材1つ。cooked=false は生、true は調理後。cut=true で、切る食材は小さく切った形(3つのかけら)になる。原点は底の中心 */
+export function makeIngredient(i: number, cooked: boolean, cut = false): THREE.Group {
   const id = INGREDIENTS[i]!.id;
-  return zukanModel("ingredient", id, ING_SIZE[id] ?? 0.12, cooked ? COOK_TINT[id] : undefined);
+  const tint = cooked ? COOK_TINT[id] : undefined;
+  if (!cut || !needsCut(i)) return zukanModel("ingredient", id, ING_SIZE[id] ?? 0.12, tint);
+  const g = new THREE.Group();
+  const size = (ING_SIZE[id] ?? 0.12) * 0.5;
+  for (const [x, z, r] of [[-0.03, -0.015, 0.4], [0.03, -0.02, 2.2], [0, 0.035, 4.1]] as const) {
+    const piece = zukanModel("ingredient", id, size, tint);
+    piece.position.set(x, 0, z);
+    piece.rotation.y = r;
+    g.add(piece);
+  }
+  return g;
 }
 
 /** 1皿(図鑑の皿ごとのモデル)。原点は皿の底の中心 */

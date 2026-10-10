@@ -10,6 +10,7 @@ export interface Held {
   kind: "food" | "drink" | "ing";
   item: number; // 料理・ドリンク・食材の番号
   cooked?: boolean; // 食材のとき、調理済みか
+  cut?: boolean; // 食材のとき、切ってあるか
 }
 
 const sleeve = new THREE.MeshStandardMaterial({ color: 0xf1efe9, roughness: 0.8 });
@@ -71,13 +72,13 @@ export class ViewModel {
 
   /** 持っているものを台の上に並べる。変わったときだけ作り直す */
   setHeld(held: Held[]) {
-    const key = held.map((h) => `${h.kind}${h.item}${h.cooked ? "c" : ""}`).join(",");
+    const key = held.map((h) => `${h.kind}${h.item}${h.cooked ? "c" : ""}${h.cut ? "k" : ""}`).join(",");
     if (key === this.key) return;
     this.key = key;
     this.items.clear();
     const trayPos: [number, number][] = [[-0.1, -0.07], [0.1, -0.07], [-0.1, 0.07], [0.1, 0.07]];
     held.slice(0, 4).forEach((h, i) => {
-      const o = h.kind === "food" ? makeDish(h.item) : h.kind === "drink" ? makeDrink(h.item) : makeIngredient(h.item, !!h.cooked);
+      const o = h.kind === "food" ? makeDish(h.item) : h.kind === "drink" ? makeDrink(h.item) : makeIngredient(h.item, !!h.cooked, !!h.cut);
       o.traverse((c) => ((c as THREE.Mesh).castShadow = false));
       o.scale.setScalar(h.kind === "ing" ? 1.1 : 0.6);
       o.position.set(trayPos[i]![0], -0.295, -0.55 + trayPos[i]![1]);

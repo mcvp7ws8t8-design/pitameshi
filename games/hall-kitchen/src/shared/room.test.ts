@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BARS, FRIDGE, PASS, RADIUS, SEATS, STOVES, TABLES, TABLE_SIZE } from "./layout";
+import { BARS, CUTS, FRIDGE, PASS, RADIUS, SEATS, STOVES, TABLES, TABLE_SIZE } from "./layout";
 import { BOUNDS, PLAYER_RADIUS, RoomState, SPAWN, blocked, step } from "./room";
 
 test("3人目は入れない", () => {
@@ -136,6 +136,7 @@ test("触れるもの(席・ドリンクバー・調理場・冷蔵庫・受け�
   BARS.forEach((s, i) => assert.ok(reachable("hall", s, RADIUS.bar), `ドリンクバー ${i}`));
   assert.ok(reachable("hall", PASS.hall, RADIUS.pass), "受け渡し台(ホール)");
   STOVES.forEach((s, i) => assert.ok(reachable("kitchen", s, RADIUS.stove), `調理場 ${i}`));
+  CUTS.forEach((s, i) => assert.ok(reachable("kitchen", s, RADIUS.board), `まな板 ${i}`));
   assert.ok(reachable("kitchen", FRIDGE, RADIUS.fridge), "冷蔵庫");
   assert.ok(reachable("kitchen", PASS.kitchen, RADIUS.pass), "受け渡し台(キッチン)");
 });

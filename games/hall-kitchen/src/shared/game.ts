@@ -2,8 +2,8 @@
 // ネットワークにも描画にも依存しない。時間は tick(dt) で進める。
 // 数字は CONFIG にまとめてある。遊んでみて調整する。
 
-import { CHAIR_ORDER, SEATS, STOVES, TABLES, nearestTarget, seatLabel } from "./layout";
-import { DISHES, DRINKS, INGREDIENTS, METHOD_NAME, dishName, drinkName, ingredientName, methodOfIngredient, type Method } from "./menu";
+import { CHAIR_ORDER, CUTS, SEATS, STOVES, TABLES, nearestTarget, seatLabel } from "./layout";
+import { DISHES, DRINKS, INGREDIENTS, METHOD_NAME, dishName, drinkName, ingredientName, methodOfIngredient, needsCut, type Method } from "./menu";
 import type { Role } from "./room";
 
 export const CONFIG = {
@@ -16,6 +16,7 @@ export const CONFIG = {
   foodPatience: 70, // 注文してから料理が届くまで
   eatTime: 4,
   holdHall: 4, // ホールが一度に運べる数(料理とドリンクの合計)
+  cutTime: 2, // まな板で1つ切る秒数
   holdKitchen: 4, // キッチンが手に持てる食材の数(生のものも、調理したものも)
   passMax: 8, // 受け渡し台に置ける数
   bars: 2, // ドリンクバーの台数
@@ -42,14 +43,16 @@ export type CustomerState = "queue" | "waitOrder" | "waitFood" | "eating";
 export type Kind = "food" | "drink";
 export type TicketStatus = "new" | "cooking" | "ready" | "pass" | "hall";
 // 料理の食材1つ1つの状態
-// need: まだ冷蔵庫から取っていない / raw: 取って持っている(生) / cooking: 調理場で調理中 /
-// ready: 調理できあがり(調理場の上) / cooked: 取って持っている(調理済み) / plated: 盛り付け台に置いた
-export type PartState = "need" | "raw" | "cooking" | "ready" | "cooked" | "plated";
+// need: まだ冷蔵庫から取っていない / raw: 取って持っている(生。切る食材は cut が false のうちは切る前) /
+// chopping: まな板で切っている / chopped: 切り終わり(まな板の上) /
+// cooking: 調理場で調理中 / ready: 調理できあがり(調理場の上) / cooked: 取って持っている(調理済み。調理しない食材は取る or 切るとこれ) / plated: 盛り付け台に置いた
+export type PartState = "need" | "raw" | "chopping" | "chopped" | "cooking" | "ready" | "cooked" | "plated";
 
 interface Part {
   ing: number;
   st: PartState;
   left: number;
+  cut: boolean; // もう切ってある(切る必要のない食材は最初から true)
 }
 
 interface Customer {
@@ -81,7 +84,7 @@ export interface TicketSnapshot {
   item: number;
   seat: number;
   status: TicketStatus;
-  parts?: { ing: number; st: PartState }[];
+  parts?: { ing: number; st: PartState; cut: boolean }[];
 }
 export interface SeatSnapshot {
   id: number; // お客さんの番号(見た目を決めるのに使う)
@@ -104,6 +107,7 @@ export interface GameSnapshot {
   selFood: number | null;
   selDrink: number | null;
   stoves: (number | null)[];
+  boards: (number | null)[];
   bars: (number | null)[];
 }
 
@@ -127,6 +131,7 @@ export class Game {
   customers: Customer[] = [];
   tickets: Ticket[] = [];
   stoves: (number | null)[] = Array(STOVES.length).fill(null);
+  boards: (number | null)[] = Array(CUTS.length).fill(null);
   bars: (number | null)[] = Array(CONFIG.bars).fill(null);
   selFood: number | null = null;
   selDrink: number | null = null;
@@ -152,6 +157,7 @@ export class Game {
     this.customers = [];
     this.tickets = [];
     this.stoves = Array(STOVES.length).fill(null);
+    this.boards = Array(CUTS.length).fill(null);
     this.bars = Array(CONFIG.bars).fill(null);
     this.selFood = this.selDrink = null;
     this.nextId = 1;
@@ -199,9 +205,9 @@ export class Game {
         continue;
       }
       for (const p of t.parts) {
-        if (p.st !== "cooking") continue;
+        if (p.st !== "cooking" && p.st !== "chopping") continue;
         p.left -= dt;
-        if (p.left <= 0) p.st = "ready";
+        if (p.left <= 0) p.st = p.st === "cooking" ? "ready" : "chopped";
       }
     }
 
@@ -295,6 +301,10 @@ export class Game {
       const id = this.stoves[i];
       if (id !== null && id !== undefined && partTicket(id) === t.id) this.stoves[i] = null;
     }
+    for (let i = 0; i < this.boards.length; i++) {
+      const id = this.boards[i];
+      if (id !== null && id !== undefined && partTicket(id) === t.id) this.boards[i] = null;
+    }
     for (let i = 0; i < this.bars.length; i++) if (this.bars[i] === t.id) this.bars[i] = null;
     if (this.selFood === t.id) this.selFood = null;
     if (this.selDrink === t.id) this.selDrink = null;
@@ -343,6 +353,7 @@ export class Game {
       return target.kind === "bar" ? this.hallBar(target.i) : this.hallPass();
     }
     if (target.kind === "stove") return this.kitchenStove(target.i);
+    if (target.kind === "board") return this.kitchenBoard(target.i);
     return target.kind === "fridge" ? this.kitchenFridge() : this.kitchenPass();
   }
 
@@ -351,7 +362,7 @@ export class Game {
     if (!c) return "";
     if (c.state === "waitOrder") {
       for (const [kind, item] of [["food", c.dish], ["drink", c.drink]] as const) {
-        const parts = kind === "food" ? DISHES[item]!.parts.map((ing) => ({ ing, st: "need" as const, left: 0 })) : [];
+        const parts = kind === "food" ? DISHES[item]!.parts.map((ing) => ({ ing, st: "need" as const, left: 0, cut: !needsCut(ing) })) : [];
         this.tickets.push({ id: this.nextId++, kind, item, seat, customer: c.id, status: "new", left: 0, parts });
       }
       c.state = "waitFood";
@@ -435,8 +446,8 @@ export class Game {
     const names: string[] = [];
     for (const p of t.parts) {
       if (p.st !== "need" || names.length >= room) continue;
-      // 生で使うもの(そのまま)は、調理せずにそのまま盛り付けられる
-      p.st = methodOfIngredient(p.ing) === "none" ? "cooked" : "raw";
+      // 生で使うもの(そのまま)で、切る必要もなければ、調理せずにそのまま盛り付けられる
+      p.st = methodOfIngredient(p.ing) === "none" && p.cut ? "cooked" : "raw";
       names.push(ingredientName(p.ing));
     }
     if (!t.parts.some((p) => p.st === "need")) this.selFood = null;
@@ -457,9 +468,11 @@ export class Game {
       return `${ingredientName(p.ing)}を取った`;
     }
     const raws = this.heldParts().filter((h) => h.p.st === "raw");
-    const fits = raws.filter((h) => methodOfIngredient(h.p.ing) === station.kind);
+    const fits = raws.filter((h) => methodOfIngredient(h.p.ing) === station.kind && h.p.cut);
     if (fits.length === 0) {
-      return raws.length === 0 ? "調理する食材を持っていません" : `${METHOD_NAME[station.kind]}で作れる食材がありません`;
+      if (raws.length === 0) return "調理する食材を持っていません";
+      const uncut = raws.some((h) => methodOfIngredient(h.p.ing) === station.kind && !h.p.cut);
+      return uncut ? "先にまな板で切ってください" : `${METHOD_NAME[station.kind]}で作れる食材がありません`;
     }
     fits.sort((a, b) => Number(b.t.id === this.selFood) - Number(a.t.id === this.selFood) || a.t.id - b.t.id || a.idx - b.idx);
     const { t, p, idx } = fits[0]!;
@@ -467,6 +480,30 @@ export class Game {
     p.left = INGREDIENTS[p.ing]?.cook ?? 1;
     this.stoves[i] = partId(t.id, idx);
     return `${ingredientName(p.ing)}を${METHOD_VERB[station.kind]}`;
+  }
+
+  /** まな板: 切り終わりがあれば取る。空いていれば、持っている食材のうち切る必要があるものを切り始める */
+  private kitchenBoard(i: number): string {
+    const id = this.boards[i];
+    if (id !== null && id !== undefined) {
+      const t = this.tickets.find((x) => x.id === partTicket(id))!;
+      const p = t.parts[partIndex(id)]!;
+      if (p.st === "chopping") return "切っている最中です";
+      if (this.heldParts().length >= CONFIG.holdKitchen) return "手がいっぱいです";
+      p.cut = true;
+      // 生で使う食材は、切ったら完成。ほかは、このあと調理場へ
+      p.st = methodOfIngredient(p.ing) === "none" ? "cooked" : "raw";
+      this.boards[i] = null;
+      return `${ingredientName(p.ing)}を切った`;
+    }
+    const raws = this.heldParts().filter((h) => h.p.st === "raw" && !h.p.cut);
+    if (raws.length === 0) return this.heldParts().length === 0 ? "切る食材を持っていません" : "切る食材がありません";
+    raws.sort((a, b) => Number(b.t.id === this.selFood) - Number(a.t.id === this.selFood) || a.t.id - b.t.id || a.idx - b.idx);
+    const { t, p, idx } = raws[0]!;
+    p.st = "chopping";
+    p.left = CONFIG.cutTime;
+    this.boards[i] = partId(t.id, idx);
+    return `${ingredientName(p.ing)}を切り始めた`;
   }
 
   /** 盛り付け台: 調理済みの食材を置く。1皿ぶんそろうと完成して、受け渡し台に出る */
@@ -511,11 +548,12 @@ export class Game {
         item,
         seat,
         status,
-        ...(kind === "food" ? { parts: parts.map((p) => ({ ing: p.ing, st: p.st })) } : {}),
+        ...(kind === "food" ? { parts: parts.map((p) => ({ ing: p.ing, st: p.st, cut: p.cut })) } : {}),
       })),
       selFood: this.currentSelected("food"),
       selDrink: this.currentSelected("drink"),
       stoves: [...this.stoves],
+      boards: [...this.boards],
       bars: [...this.bars],
     };
   }

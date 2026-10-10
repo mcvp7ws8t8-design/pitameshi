@@ -2,7 +2,7 @@
 // 時間は秒。ドリンクの relief は、出したときにお客さんの我慢ゲージが戻る割合(0〜1)。
 // 手間のかかるものほど、効き目が大きい。
 
-// 料理は、食材を3個まで、冷蔵庫から取って、それぞれ「焼く・茹でる・揚げる」のどれかで調理し(生で使うものは調理しない)、
+// 料理は、食材を3個まで、冷蔵庫から取って、(必要なら)まな板で切り、それぞれ「焼く・茹でる・揚げる」のどれかで調理し(生で使うものは調理しない)、
 // 盛り付け台で1皿にする。食材は40種。調理法ごとに専用の調理場がある。
 export type Method = "grill" | "boil" | "fry";
 export const METHOD_NAME: Record<Method, string> = { grill: "焼き", boil: "茹で", fry: "揚げ" };
@@ -14,47 +14,48 @@ export interface Ingredient {
   id: string; // クライアントの3Dモデル(src/client/zukan.ts)の名前
   name: string;
   method: Prep;
+  cut?: true; // 先にまな板で切る(切ってから、焼く・茹でる・揚げる。「そのまま」のものは切って完成)
   cook: number; // 調理にかかる秒数(そのままのものは 0)
 }
 
-// 焼く13・茹でる10・揚げる5・そのまま12。id は、クライアントの3Dモデル(src/client/zukan.ts)の名前
+// 焼く13・茹でる10・揚げる5・そのまま12。cut のあるものは、先にまな板で切る(18種)。id は、クライアントの3Dモデル(src/client/zukan.ts)の名前
 export const INGREDIENTS: Ingredient[] = [
   // 焼く
   { id: "ground_meat", name: "合い挽き肉", method: "grill", cook: 5 },
-  { id: "beef", name: "牛肉", method: "grill", cook: 7 },
-  { id: "chicken", name: "鶏肉", method: "grill", cook: 5 },
-  { id: "pork", name: "豚肉", method: "grill", cook: 4 },
+  { id: "beef", name: "牛肉", method: "grill", cook: 7, cut: true },
+  { id: "chicken", name: "鶏肉", method: "grill", cook: 5, cut: true },
+  { id: "pork", name: "豚肉", method: "grill", cook: 4, cut: true },
   { id: "bacon", name: "ベーコン", method: "grill", cook: 3 },
   { id: "sausage", name: "ソーセージ", method: "grill", cook: 3 },
-  { id: "salmon", name: "鮭", method: "grill", cook: 5 },
-  { id: "tuna", name: "まぐろ", method: "grill", cook: 3 },
+  { id: "salmon", name: "鮭", method: "grill", cook: 5, cut: true },
+  { id: "tuna", name: "まぐろ", method: "grill", cook: 3, cut: true },
   { id: "egg", name: "卵", method: "grill", cook: 2 },
   { id: "bread", name: "食パン", method: "grill", cook: 2 },
-  { id: "onion", name: "玉ねぎ", method: "grill", cook: 3 },
-  { id: "green_pepper", name: "ピーマン", method: "grill", cook: 2 },
-  { id: "garlic", name: "にんにく", method: "grill", cook: 2 },
+  { id: "onion", name: "玉ねぎ", method: "grill", cook: 3, cut: true },
+  { id: "green_pepper", name: "ピーマン", method: "grill", cook: 2, cut: true },
+  { id: "garlic", name: "にんにく", method: "grill", cook: 2, cut: true },
   // 茹でる
   { id: "pasta", name: "パスタ", method: "boil", cook: 6 },
   { id: "chinese_noodles", name: "中華麺", method: "boil", cook: 5 },
   { id: "rice", name: "米", method: "boil", cook: 5 },
-  { id: "tofu", name: "豆腐", method: "boil", cook: 2 },
-  { id: "carrot", name: "にんじん", method: "boil", cook: 3 },
-  { id: "cabbage", name: "キャベツ", method: "boil", cook: 2 },
-  { id: "negi", name: "長ねぎ", method: "boil", cook: 1 },
+  { id: "tofu", name: "豆腐", method: "boil", cook: 2, cut: true },
+  { id: "carrot", name: "にんじん", method: "boil", cook: 3, cut: true },
+  { id: "cabbage", name: "キャベツ", method: "boil", cook: 2, cut: true },
+  { id: "negi", name: "長ねぎ", method: "boil", cook: 1, cut: true },
   { id: "miso", name: "味噌", method: "boil", cook: 2 },
   { id: "curry_roux", name: "カレールー", method: "boil", cook: 4 },
   { id: "milk", name: "牛乳", method: "boil", cook: 2 },
   // 揚げる
   { id: "shrimp", name: "えび", method: "fry", cook: 3 },
-  { id: "eggplant", name: "なす", method: "fry", cook: 3 },
-  { id: "potato", name: "じゃがいも", method: "fry", cook: 4 },
+  { id: "eggplant", name: "なす", method: "fry", cook: 3, cut: true },
+  { id: "potato", name: "じゃがいも", method: "fry", cook: 4, cut: true },
   { id: "breadcrumbs", name: "パン粉", method: "fry", cook: 2 },
   { id: "flour", name: "小麦粉", method: "fry", cook: 2 },
   // そのまま(調理しない)
-  { id: "lettuce", name: "レタス", method: "none", cook: 0 },
-  { id: "cucumber", name: "きゅうり", method: "none", cook: 0 },
-  { id: "tomato", name: "トマト", method: "none", cook: 0 },
-  { id: "lemon", name: "レモン", method: "none", cook: 0 },
+  { id: "lettuce", name: "レタス", method: "none", cook: 0, cut: true },
+  { id: "cucumber", name: "きゅうり", method: "none", cook: 0, cut: true },
+  { id: "tomato", name: "トマト", method: "none", cook: 0, cut: true },
+  { id: "lemon", name: "レモン", method: "none", cook: 0, cut: true },
   { id: "strawberry", name: "いちご", method: "none", cook: 0 },
   { id: "nori", name: "のり", method: "none", cook: 0 },
   { id: "salt", name: "塩", method: "none", cook: 0 },
@@ -132,6 +133,8 @@ export const DRINKS: DrinkInfo[] = [
   { name: "日本酒", make: 3, relief: 0.5 },
 ];
 
+/** まな板で切ってから使う食材か */
+export const needsCut = (i: number): boolean => INGREDIENTS[i]?.cut === true;
 export const ingredientName = (i: number): string => INGREDIENTS[i]?.name ?? "?";
 export const methodOfIngredient = (i: number): Prep => INGREDIENTS[i]?.method ?? "grill";
 export const dishName = (i: number): string => DISHES[i]?.name ?? "?";
