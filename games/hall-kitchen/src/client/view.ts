@@ -6,6 +6,7 @@ import { partIndex, partTicket, type GameSnapshot } from "../shared/game";
 import { BARS, CUTS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, queueSpot, seatLabel } from "../shared/layout";
 import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink, makeIngredient } from "./items";
+import { zukanEquipment } from "./zukan";
 import { dishColorHex } from "./items";
 import type { Kitchen } from "./kitchen";
 import { Effects } from "./effects";
@@ -81,42 +82,11 @@ function tagSprite(text: string, size: number, color = "#222"): THREE.Sprite {
   return s;
 }
 
-function pan(): THREE.Group {
-  const g = new THREE.Group();
-  const m = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.4, metalness: 0.8 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.05, 24), m);
-  body.position.y = 0.03;
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.025, 0.03), m);
-  handle.position.set(0.3, 0.05, 0);
-  body.castShadow = handle.castShadow = true;
-  g.add(body, handle);
-  return g;
-}
-
-function pot(): THREE.Group {
-  const g = new THREE.Group();
-  const m = new THREE.MeshStandardMaterial({ color: 0xb8bdc4, roughness: 0.3, metalness: 0.9 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.2, 24), m);
-  body.position.y = 0.1;
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.02, 24), m);
-  lid.position.y = 0.21;
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), m);
-  knob.position.y = 0.25;
-  body.castShadow = lid.castShadow = true;
-  g.add(body, lid, knob);
-  return g;
-}
-
-function basket(): THREE.Group {
-  const g = new THREE.Group();
-  const m = new THREE.MeshStandardMaterial({ color: 0x6a6e75, roughness: 0.4, metalness: 0.9 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.3), m);
-  body.position.y = 0.06;
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.03), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 }));
-  handle.position.set(0.3, 0.1, 0);
-  body.castShadow = handle.castShadow = true;
-  g.add(body, handle);
-  return g;
+// 調理中の調理器具(「3Dキッチン」の道具)。[モデル, 食材を置く高さ]
+const COOKWARE = { grill: ["frying_pan", 0.012], boil: ["pot_water", 0.17], fry: ["fry_basket", 0.045] } as const;
+function cookware(kind: "grill" | "boil" | "fry"): [THREE.Group, number] {
+  const [id, y] = COOKWARE[kind];
+  return [zukanEquipment(id)!.clone(true), y];
 }
 
 /** 入れ物の中身を、キー(種類)が変わったときだけ作り直す */
@@ -210,13 +180,15 @@ export class GameView {
     }
 
     STOVES.forEach((s) => {
-      this.stoveSlot.push(new Slot(scene, s.x, 0.97, s.z));
+      // コンロ・フライヤーの天板の中心(kitchen.ts の置き場所と同じ)
+      const back = s.kind !== "boil";
+      this.stoveSlot.push(new Slot(scene, back ? s.x : s.x - 0.2, 0.9, back ? s.z - 0.2 : s.z));
       const tag = tagSprite(`${METHOD_NAME[s.kind]}${STOVES.filter((x, k) => x.kind === s.kind && k <= STOVES.indexOf(s)).length}`, 0.5, s.kind === "grill" ? "#a5471b" : s.kind === "boil" ? "#2a6f97" : "#9a7413");
       tag.position.set(s.x, 1.6, s.z);
       scene.add(tag);
     });
     CUTS.forEach((s, i) => {
-      this.boardSlot.push(new Slot(scene, 9.3, 0.95, s.z));
+      this.boardSlot.push(new Slot(scene, 9.3, 0.93, s.z));
       const tag = tagSprite(`切る${i + 1}`, 0.4, "#6b7a2a");
       tag.position.set(9.3, 1.35, s.z);
       scene.add(tag);
@@ -309,15 +281,15 @@ export class GameView {
       const part = id === null ? undefined : byId.get(partTicket(id))?.parts?.[partIndex(id)];
       const cooking = part?.st === "cooking";
       const kind = STOVES[i]!.kind;
-      const cookware = kind === "grill" ? pan : kind === "boil" ? pot : basket;
       this.stoveSlot[i]!.set(!part || id === null ? "" : `${id}${part.st}`, () => {
         if (!part) return null;
         const g2 = new THREE.Group();
         if (cooking) {
-          g2.add(cookware());
+          const [ware, y] = cookware(kind);
+          g2.add(ware);
           const raw = makeIngredient(part.ing, false, true);
           raw.scale.setScalar(0.8);
-          raw.position.y = 0.05;
+          raw.position.y = y;
           g2.add(raw);
         } else {
           // できあがり。小皿にのせて置いてある

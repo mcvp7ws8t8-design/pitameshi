@@ -65,19 +65,28 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
     return o;
   };
 
-  // ---- 調理場: コンロ(奥の壁に焼く5・揚げる2、左の壁に茹でる4)と、その間の調理台。調理中は天板の光る円が点く ----
+  // ---- 調理場: コンロ(焼く5・茹でる4)とフライヤー(揚げる2)と、その間の調理台。調理中は天板が光る ----
   const glowOf = { grill: [0x3b3d41, 0xff4a10], fry: [0xb87a14, 0xff4a10], boil: [0x5f9bc4, 0x7ec8ff] } as const;
   STOVES.forEach((s) => {
     const back = s.kind !== "boil";
     const x = back ? s.x : s.x - 0.2;
     const z = back ? s.z - 0.2 : s.z;
     const rotY = back ? 0 : Math.PI / 2;
-    equip("stove", x, 0, z, rotY);
     const [base, emissive] = glowOf[s.kind];
-    const m = glow(base, emissive, 0.3, 0.4);
-    const disc = cyl(0.17, 0.17, 0.012, m, x, 0.905, z, 28);
-    disc.castShadow = false;
-    scene.add(disc);
+    const m = glow(base, emissive, s.kind === "fry" ? 0.1 : 0.3, s.kind === "fry" ? 0.1 : 0.4);
+    if (s.kind === "fry") {
+      // フライヤー: 2つの油槽が、調理中に光る
+      equip("fryer", x, 0, z, rotY);
+      for (const dx of [-0.25, 0.25]) {
+        const oil = box(0.36, 0.012, 0.48, m, x + dx, 0.903, z, { cast: false, recv: false });
+        scene.add(oil);
+      }
+    } else {
+      equip("stove", x, 0, z, rotY);
+      const disc = cyl(0.17, 0.17, 0.012, m, x, 0.905, z, 28);
+      disc.castShadow = false;
+      scene.add(disc);
+    }
     burners.push([m]);
     if (back) equip("hood", x, 1.75, z); // 奥の壁のコンロには、レンジフード
   });
@@ -99,7 +108,8 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
 
   // ---- シンクと洗い場(右奥) ----
   equip("sink", 8.5, 0, -9.0);
-  for (let k = 0; k < 8; k++) scene.add(cyl(0.12, 0.1, 0.018, plain(0xf6f6f2, 0.25, 0), 9.1, 0.92 + k * 0.02, -8.7, 20));
+  for (let k = 0; k < 8; k++) equip("plate", 9.1, 0.9 + k * 0.016, -8.7);
+  equip("cardboard_box", 7.5, 0, -9.0, 0.1);
 
   // ---- 右の壁: 作業台(下は引き出し付きの冷蔵庫)・まな板・オーブン・ワイヤー棚 ----
   const bright = plain(0xc9ced4, 0.28, 0.95);
@@ -110,44 +120,29 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
   scene.add(box(0.02, 0.55, 0.55, new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.08, metalness: 0.6 }), 8.89, 1.3, -2.95, { cast: false })); // ガラス扉
   scene.add(box(0.02, 0.16, 0.5, new THREE.MeshStandardMaterial({ color: 0x1a1f24, emissive: 0xff7a1a, emissiveIntensity: 1.2 }), 8.89, 1.66, -2.95, { cast: false })); // 表示部
   scene.add(box(0.03, 0.03, 0.4, bright, 8.87, 1.55, -2.95));
-  const boards = [0xf2f0ea, 0xe8c77a, 0x7fae6a, 0xd9867a];
-  boards.forEach((c, k) => {
-    scene.add(box(0.42, 0.025, 0.6, plain(c, 0.7, 0), 9.3, 0.93, -4.0 - k * 0.8));
-  });
-  scene.add(box(0.03, 0.018, 0.3, bright, 9.28, 0.96, -4.1));
-  scene.add(box(0.025, 0.02, 0.13, plain(0x2a2a2c, 0.6, 0.1), 9.28, 0.96, -4.32));
+  for (let k = 0; k < 4; k++) equip("cutting_board", 9.3, 0.9, -4.0 - k * 0.8, Math.PI / 2 + (k % 2 ? 0.05 : -0.05));
+  equip("knife", 9.3, 0.926, -4.1, 1.1);
+  equip("knife_block", 9.55, 0.9, -7.5, -0.4);
+  equip("cookbook", 9.3, 0.9, -7.0, 0.3);
+  equip("bowl", 9.3, 0.9, -7.8, 0);
   const tubColors = [0xd9453b, 0x6aa83a, 0xe9a23a, 0xf0e6c8];
   for (let k = 0; k < 5; k++) {
     scene.add(box(0.3, 0.1, 0.22, plain(tubColors[k % 4]!, 0.5, 0), 9.62, 0.97, -3.9 - k * 0.55, { round: 0.01 }));
   }
-  // 壁棚(2段)
+  // 壁棚(2段)。下の段にスパイス瓶
   for (const cz of [-7.3, -6.1, -4.9, -3.7]) for (const y of [1.35, 1.85]) equip("wall_shelf", 9.62, y, cz, -Math.PI / 2);
+  for (const cz of [-7.3, -6.1, -4.9, -3.7]) for (let k = 0; k < 4; k++) equip(`spice_jar_${k + 1}`, 9.62, 1.57, cz - 0.4 + k * 0.27);
   // 手洗い用の石けんとペーパータオル
   scene.add(box(0.08, 0.2, 0.06, plain(0xe8eef2, 0.4, 0), 9.85, 1.2, -9.55), box(0.2, 0.28, 0.1, plain(0xc9ced4, 0.3, 0.9), 9.85, 1.5, -9.0));
 
   // ---- 左の壁: 調理器具を吊るすレール ----
   scene.add(rotated(cyl(0.012, 0.012, 5.0, darkSteel, -9.75, 1.95, -5, 8), Math.PI / 2, 0, 0));
+  const hang = [["ladle", 1.52], ["spatula", 1.56], ["spatula", 1.56]] as const;
   for (let k = 0; k < 9; k++) {
     const z = -2.7 - k * 0.5;
-    const metal = plain(0xbfc4ca, 0.25, 1);
-    scene.add(cyl(0.006, 0.006, 0.05, metal, -9.75, 1.92, z, 6));
-    if (k % 3 === 0) {
-      // お玉
-      scene.add(cyl(0.008, 0.008, 0.4, metal, -9.75, 1.7, z, 6));
-      const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xbfc4ca, roughness: 0.25, metalness: 1, side: THREE.DoubleSide }));
-      bowl.position.set(-9.75, 1.5, z);
-      scene.add(bowl);
-    } else if (k % 3 === 1) {
-      // トング
-      scene.add(box(0.012, 0.36, 0.03, metal, -9.75, 1.72, z));
-    } else {
-      // 泡立て器
-      scene.add(cyl(0.006, 0.006, 0.2, metal, -9.75, 1.82, z, 6));
-      const wh = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.003, 6, 14), metal);
-      wh.position.set(-9.75, 1.6, z);
-      wh.rotation.y = Math.PI / 2;
-      scene.add(wh);
-    }
+    const [id, y] = hang[k % 3]!;
+    scene.add(cyl(0.006, 0.006, 0.05, plain(0xbfc4ca, 0.25, 1), -9.75, 1.92, z, 6));
+    equip(id, -9.72, y, z, k % 2 ? 0.2 : -0.2);
   }
 
   // ---- 床: ゴムの足元マット、排水口 ----
@@ -163,7 +158,7 @@ export function buildKitchen(scene: THREE.Scene, h: KitchenHelpers): Kitchen {
   clock.rotation.x = Math.PI / 2;
   clock.position.set(-5, 2.7, -1.03);
   scene.add(clock, box(0.012, 0.14, 0.01, plain(0x111111, 0.5, 0), -5, 2.74, -1.06), box(0.1, 0.012, 0.01, plain(0x111111, 0.5, 0), -4.95, 2.7, -1.06));
-  for (let k = 0; k < 6; k++) scene.add(cyl(0.12, 0.1, 0.018, plain(0xf6f6f2, 0.25, 0), -1.9, 1.06 + k * 0.02, -0.7, 20));
+  for (let k = 0; k < 6; k++) equip("plate", -1.9, 1.04 + k * 0.016, -0.7);
 
   // ---- 壁のステンレス張り、天井の設備(LED照明・ダクト・配管)、排水溝 ----
   const wallSteel = steel(8, 2);
