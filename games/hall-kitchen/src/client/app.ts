@@ -8,6 +8,7 @@ import { dishColorCss, drinkColorCss } from "./items";
 import { animateWalk, buildPerson, lookFor, type Person } from "./people";
 import { preloadFood } from "./food";
 import { Sound } from "./audio";
+import { botNet } from "./net-bots";
 import { loadHdri } from "./hdri";
 import { loadModel, placeable } from "./models";
 import { buildRestaurant } from "./scene";
@@ -105,6 +106,8 @@ resize();
 
 // ---- 状態 ----
 let myId = "";
+/** ボットのプレイを眺めているとき。自分では動かせず、ボットの目線になる */
+let spectating = false;
 let myRole: Role | null = null;
 let game: GameSnapshot | null = null;
 let infoTimer = 0;
@@ -130,11 +133,12 @@ function say(text: string) {
 }
 
 // ---- 通信 ----
-function connect(code: string, create: boolean) {
+function connect(code: string, create: boolean, factory: NetFactory | null = netFactory) {
   if (!ROOM_CODE.test(code)) return say("部屋コードは英字4文字です");
-  if (!netFactory) return say("通信の準備ができていません");
+  if (!factory) return say("通信の準備ができていません");
   net?.close();
-  net = netFactory(code, create, {
+  spectating = false;
+  net = factory(code, create, {
     open() {
       $("step1").hidden = true;
       $("step2").hidden = false;
@@ -152,11 +156,20 @@ function connect(code: string, create: boolean) {
       say("接続が切れました");
     },
     message(msg) {
-      if (msg.t === "welcome") myId = msg.id;
+      if (msg.t === "welcome") {
+        myId = msg.id;
+        spectating = !!msg.spectate;
+      }
       else if (msg.t === "game") onGame(msg.g);
       else if (msg.t === "info") {
         toast(msg.text);
         sound.action();
+        // ボットが冷蔵庫から取ったとき
+        if (spectating && myRole === "kitchen" && nearestTarget("kitchen", me.x, me.z)?.kind === "fridge") {
+          kitchen.openFridge();
+          view.effects.fridgeFog();
+          sound.fridge();
+        }
       }
       else if (msg.t === "error") {
         say({ full: "この部屋は満員です", "role-taken": "その役割は選ばれています", "bad-message": "通信エラー" }[msg.reason]);
@@ -183,6 +196,12 @@ function onState(list: PlayerSnapshot[]) {
     Object.assign(me, { x: mine.x, z: mine.z, yaw: mine.yaw, pitch: 0 });
     $("ui").classList.add("hidden");
     for (const id of ["hud", "cross", "top", "side"]) $(id).hidden = false;
+  } else if (mine?.role && spectating) {
+    // ボットの目線: 位置も向きも、そのまま追いかける
+    me.x += (mine.x - me.x) * 0.5;
+    me.z += (mine.z - me.z) * 0.5;
+    me.yaw += Math.atan2(Math.sin(mine.yaw - me.yaw), Math.cos(mine.yaw - me.yaw)) * 0.35;
+    me.pitch += (-0.15 - me.pitch) * 0.1;
   } else if (mine?.role) {
     // 自分の位置は手元の予測を優先し、ずれが大きいときだけサーバーに合わせる
     const err = Math.hypot(mine.x - me.x, mine.z - me.z);
@@ -226,6 +245,10 @@ let partner = "";
 let partnerReady = false;
 function renderHud() {
   if (!myRole) return;
+  if (spectating) {
+    $("hud").innerHTML = `<span class="chip role">${ROLE_NAME[myRole]}のボット</span><span class="chip"><kbd>Tab</kbd> 視点</span><span class="chip"><kbd>F</kbd> 早送り</span>`;
+    return;
+  }
   $("hud").innerHTML = `<span class="chip role">${ROLE_NAME[myRole]}</span><span class="chip ${partnerReady ? "ok" : "wait"}">${partner}</span><span class="chip">音 ${sound.on ? "オン" : "オフ"} <kbd>M</kbd></span>`;
 }
 
@@ -432,6 +455,17 @@ const keys = new Set<string>();
 addEventListener("keydown", (e) => {
   keys.add(e.code);
   if (e.repeat) return;
+  if (spectating) {
+    if (e.code === "Tab") {
+      e.preventDefault();
+      send({ t: "watch", cmd: "swap" });
+    } else if (e.code === "KeyF") send({ t: "watch", cmd: "fast" });
+    else if (e.code === "KeyM") {
+      sound.toggle();
+      renderHud();
+    } else if (e.code === "Enter" && game?.phase === "over") send({ t: "restart" });
+    return;
+  }
   if (e.code === "KeyE") {
     if (myRole === "kitchen" && nearestTarget("kitchen", me.x, me.z)?.kind === "fridge") {
       kitchen.openFridge();
@@ -477,12 +511,13 @@ function axes() {
 
 // 入力は 20Hz で送る。止まっているときも送って、サーバー側の時刻を進める
 setInterval(() => {
-  if (!myRole) return;
+  if (!myRole || spectating) return;
   const { mx, mz } = axes();
   send({ t: "input", mx, mz, yaw: me.yaw });
 }, 50);
 
 // ---- 描画 ----
+let lastSeen = { x: 0, z: 0 }; // 眺めているとき、1つ前のフレームの位置(歩いている速さを出す)
 let prev = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.1, (now - prev) / 1000);
@@ -490,11 +525,14 @@ renderer.setAnimationLoop((now) => {
   if (myRole) {
     const { mx, mz } = axes();
     const key = (c: string) => (keys.has(c) ? 1 : 0);
-    me.yaw += (key("ArrowLeft") - key("ArrowRight")) * dt * 2.2;
-    me.pitch = Math.max(-1.3, Math.min(1.3, me.pitch + (key("ArrowUp") - key("ArrowDown")) * dt * 1.5));
-    const before = { x: me.x, z: me.z };
-    Object.assign(me, step(me, myRole, mx, mz, me.yaw, dt));
+    const before = spectating ? lastSeen : { x: me.x, z: me.z };
+    if (!spectating) {
+      me.yaw += (key("ArrowLeft") - key("ArrowRight")) * dt * 2.2;
+      me.pitch = Math.max(-1.3, Math.min(1.3, me.pitch + (key("ArrowUp") - key("ArrowDown")) * dt * 1.5));
+      Object.assign(me, step(me, myRole, mx, mz, me.yaw, dt));
+    }
     const moved = Math.hypot(me.x - before.x, me.z - before.z);
+    lastSeen = { x: me.x, z: me.z };
     speed = moved / Math.max(dt, 1e-3);
     stepDist += moved;
     if (stepDist > 0.85) {
@@ -526,6 +564,7 @@ renderer.setAnimationLoop((now) => {
 // ---- ロビー ----
 const randomCode = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("");
 $("create").onclick = () => connect(randomCode(), true);
+$("watch").onclick = () => connect("BOTS", true, botNet);
 $("join").onclick = () => connect(($<HTMLInputElement>("code")).value.trim().toUpperCase(), false);
 $("hall").onclick = () => send({ t: "role", role: "hall" });
 $("kitchen").onclick = () => send({ t: "role", role: "kitchen" });

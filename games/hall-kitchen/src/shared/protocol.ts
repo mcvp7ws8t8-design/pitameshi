@@ -9,10 +9,12 @@ export type ClientMessage =
   | { t: "input"; mx: number; mz: number; yaw: number }
   | { t: "act" } // E キー
   | { t: "next" } // 調理する注文の切り替え
-  | { t: "restart" };
+  | { t: "restart" }
+  // ボットのプレイを眺めるとき(src/client/net-bots.ts)だけ使う。swap: 見る目線を切り替える / fast: 早送り
+  | { t: "watch"; cmd: "swap" | "fast" };
 
 export type ServerMessage =
-  | { t: "welcome"; id: string }
+  | { t: "welcome"; id: string; spectate?: boolean } // spectate: 動かせない、眺めるだけ
   | { t: "state"; players: PlayerSnapshot[] }
   | { t: "game"; g: GameSnapshot }
   | { t: "info"; text: string }
