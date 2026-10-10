@@ -1,5 +1,5 @@
 // ゲームの状態(サーバーから届く GameSnapshot)を3Dの店に映す。
-// 席のお客さん・入口の行列・コンロの料理・受け渡し台の料理・ドリンクバー・席の番号。
+// 席のお客さん・入口の行列・コンロの料理・受け渡し台の料理・バーカウンター・席の番号。
 
 import * as THREE from "three";
 import { partIndex, partTicket, type GameSnapshot } from "../shared/game";
@@ -7,6 +7,7 @@ import { BARS, CUTS, FRIDGE, PASS, PASS_SLOT, QUEUE_MAX_SHOWN, SEATS, STOVES, qu
 import { METHOD_NAME } from "../shared/menu";
 import { makeDish, makeDrink, makeIngredient } from "./items";
 import { zukanEquipment } from "./zukan";
+import { BACKBAR_TOP, BACKBAR_Z } from "./bar";
 import { dishColorHex } from "./items";
 import type { Kitchen } from "./kitchen";
 import { Effects } from "./effects";
@@ -193,7 +194,7 @@ export class GameView {
       tag.position.set(9.3, 1.35, s.z);
       scene.add(tag);
     });
-    BARS.forEach((s) => this.barSlot.push(new Slot(scene, 9.4, 1.06, s.z)));
+    BARS.forEach((s) => this.barSlot.push(new Slot(scene, s.x, BACKBAR_TOP, BACKBAR_Z)));
     const fridgeTag = tagSprite("冷蔵庫", 0.6, "#2f6f8f");
     fridgeTag.position.set(FRIDGE.x, 2.3, FRIDGE.z + 0.6);
     scene.add(fridgeTag);

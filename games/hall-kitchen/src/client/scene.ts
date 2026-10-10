@@ -1,11 +1,12 @@
 // 店の3Dモデル。ホール(z > 0)とキッチン(z < 0)がカウンターで分かれている。
 // 画像やモデルのファイルは使わず、形と質感はすべてコードで作る。
-// 位置は src/shared/layout.ts と合わせてある(席・コンロ・ドリンクバー・受け渡し窓)。
+// 位置は src/shared/layout.ts と合わせてある(席・コンロ・バーカウンター・受け渡し窓)。
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { BARS, SEATS, STOVES, TABLES, TABLE_SIZE } from "../shared/layout";
+import { SEATS, STOVES, TABLES, TABLE_SIZE } from "../shared/layout";
+import { buildBar } from "./bar";
 import { buildKitchen, type Kitchen } from "./kitchen";
 import * as tex from "./textures";
 
@@ -215,35 +216,8 @@ export function buildRestaurant(renderer: THREE.WebGLRenderer): Restaurant {
     }
   }
 
-  // ---- ホール: ドリンクバー(右の壁沿い。BARS の x=8.8 側に立つ) ----
-  scene.add(box(1.0, 1.0, 3.8, wood(2, 1), 9.4, 0.5, 2.6));
-  scene.add(box(1.1, 0.06, 3.9, steelM(2, 2), 9.4, 1.03, 2.6, { round: 0.015 }));
-  for (const z of [1.6, 3.6]) {
-    scene.add(cylinder(0.12, 0.14, 0.04, plain(0x1e1e20, 0.3, 0.8), 9.4, 1.08, z)); // ドリンクを作る台
-  }
-  for (const z of [2.2, 2.6, 3.0]) {
-    scene.add(cylinder(0.02, 0.02, 0.22, steelM(1, 1), 9.7, 1.18, z, 8));
-    const handle = box(0.03, 0.12, 0.03, plain(0x7e2f2f, 0.4), 9.7, 1.34, z);
-    scene.add(handle);
-  }
-  scene.add(box(0.4, 0.04, 3.8, wood(2, 1), 9.7, 1.7, 2.6), box(0.4, 0.04, 3.8, wood(2, 1), 9.7, 2.1, 2.6));
-  const bottleColors = [0x2f6b3a, 0x8a5a2b, 0x8a1a2e, 0xcfe8f5, 0xe9b43a, 0x2b4a7a, 0xf4f1e6, 0x6a2a6a];
-  for (let k = 0; k < 14; k++) {
-    const z = 0.9 + k * 0.28;
-    const c = bottleColors[k % bottleColors.length]!;
-    const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 });
-    for (const y of [1.72 + 0.14, 2.12 + 0.14]) {
-      scene.add(cylinder(0.04, 0.04, 0.22, m, 9.7, y, z, 12), cylinder(0.015, 0.02, 0.1, m, 9.7, y + 0.16, z, 8));
-    }
-  }
-  const neon = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.5, 0.4),
-    new THREE.MeshBasicMaterial({ map: tex.chalkboard(["DRINK BAR"]), toneMapped: false }),
-  );
-  neon.position.set(9.85, 2.7, 2.6);
-  neon.rotation.y = -Math.PI / 2;
-  scene.add(neon);
-  void BARS;
+  // ---- ホール: バーカウンター(右奥の角。ドリンクはここで作る) ----
+  buildBar(scene, { box, cyl: (rt, rb, h, m, x, y, z, seg) => cylinder(rt, rb, h, m, x, y, z, seg), plain, steel: (w, h) => steelM(w, h) });
 
   // ---- キッチンの設備(調理場・冷蔵庫・シンク・作業台・棚・伝票レール) ----
   const kitchen = buildKitchen(scene, {

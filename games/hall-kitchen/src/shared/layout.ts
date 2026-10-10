@@ -65,10 +65,13 @@ export const STOVES: Station[] = [
 // まな板(キッチン側の右の壁の作業台)。3枚で、生の食材を切る。
 export const CUTS: Spot[] = [-4.0, -4.8, -5.6].map((z) => ({ x: 8.8, z }));
 
-// ドリンクバー(ホール側の右の壁)。2台で、ホールが飲み物を作る。
+// バーカウンター(ホールの右奥の角)。手前のカウンター(お客さん側、スツールつき)と、奥の仕切りの壁ぎわのバックバーの間に入って、
+// ホールが飲み物を作る(2か所)。入口は、カウンターの左端と隣のテーブルの間。
+export const BAR_COUNTER = { x0: 7.0, x1: 9.7, z0: 1.85, z1: 2.55 };
+export const BAR_STOOLS: Spot[] = [7.7, 8.35, 9.0].map((x) => ({ x, z: 3.2 }));
 export const BARS: Spot[] = [
-  { x: 8.8, z: 1.6 },
-  { x: 8.8, z: 3.6 },
+  { x: 7.9, z: 1.25 },
+  { x: 9.0, z: 1.25 },
 ];
 
 // 冷蔵庫(食材はここから取る)。奥の壁、調理場の右。
@@ -130,7 +133,8 @@ const rect = (cx: number, cz: number, w: number, d: number): Rect => ({ x0: cx -
 export const OBSTACLES: Record<Role, Rect[]> = {
   hall: [
     ...TABLES.map((t) => rect(t.x, t.z, TABLE_SIZE[t.seats].w, TABLE_SIZE[t.seats].d)),
-    rect(9.4, 2.6, 1.0, 3.8), // ドリンクバー
+    rect((BAR_COUNTER.x0 + BAR_COUNTER.x1) / 2, (BAR_COUNTER.z0 + BAR_COUNTER.z1) / 2, BAR_COUNTER.x1 - BAR_COUNTER.x0, BAR_COUNTER.z1 - BAR_COUNTER.z0), // バーのカウンター
+    ...BAR_STOOLS.map((s) => rect(s.x, s.z, 0.4, 0.4)), // スツール
   ],
   kitchen: [
     ...STOVES.map((s) => (s.kind === "boil" ? rect(s.x, s.z, 1.0, 1.4) : rect(s.x, s.z, 1.8, 1.0))),

@@ -338,7 +338,7 @@ function renderSide(g: GameSnapshot) {
   let html = `<h3>ドリンクの注文 <span class="count">${news.length}</span><kbd>R</kbd></h3>`;
   html += news.slice(0, 7).map((t) => slip(t, t.id === g.selDrink)).join("");
   if (news.length > 7) html += `<div class="more">ほか ${news.length - 7} 件</div>`;
-  html += `<h3 class="sub">ドリンクバー</h3>${slots.join("")}`;
+  html += `<h3 class="sub">バーカウンター</h3>${slots.join("")}`;
   html += `<h3 class="sub">トレー <span class="count">${held.length}/${CONFIG.holdHall}</span></h3>`;
   html += held.length ? held.map((t) => `<div class="row"><span>${seatLabel(t.seat)}</span><span>${itemName(t)}</span></div>`).join("") : `<div class="dim">なし</div>`;
   html += `<div class="row foot"><span>受け渡し台の料理</span><span>${mine.filter((t) => t.status === "pass").length}</span></div>`;
