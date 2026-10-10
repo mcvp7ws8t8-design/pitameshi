@@ -8,56 +8,57 @@ export type Method = "grill" | "boil" | "fry";
 export const METHOD_NAME: Record<Method, string> = { grill: "焼き", boil: "茹で", fry: "揚げ" };
 
 export interface Ingredient {
+  id: string; // クライアントの3Dモデル(src/client/zukan.ts)の名前
   name: string;
   method: Method;
   cook: number; // 調理にかかる秒数
 }
 
-// 焼く16・茹でる12・揚げる12
+// 焼く15・茹でる15・揚げる10。id は、クライアントの3Dモデル(src/client/zukan.ts)の名前
 export const INGREDIENTS: Ingredient[] = [
   // 焼く
-  { name: "合い挽き肉", method: "grill", cook: 5 },
-  { name: "牛ステーキ肉", method: "grill", cook: 7 },
-  { name: "鶏もも肉", method: "grill", cook: 5 },
-  { name: "豚バラ肉", method: "grill", cook: 4 },
-  { name: "卵", method: "grill", cook: 2 },
-  { name: "玉ねぎ", method: "grill", cook: 3 },
-  { name: "ピーマン", method: "grill", cook: 2 },
-  { name: "しいたけ", method: "grill", cook: 3 },
-  { name: "ごはん", method: "grill", cook: 3 },
-  { name: "食パン", method: "grill", cook: 2 },
-  { name: "チーズ", method: "grill", cook: 1 },
-  { name: "ベーコン", method: "grill", cook: 3 },
-  { name: "焼き鳥串", method: "grill", cook: 5 },
-  { name: "鮭", method: "grill", cook: 5 },
-  { name: "なす", method: "grill", cook: 3 },
-  { name: "餃子", method: "grill", cook: 4 },
+  { id: "ground_meat", name: "合い挽き肉", method: "grill", cook: 5 },
+  { id: "beef", name: "牛肉", method: "grill", cook: 7 },
+  { id: "chicken", name: "鶏肉", method: "grill", cook: 5 },
+  { id: "pork", name: "豚肉", method: "grill", cook: 4 },
+  { id: "bacon", name: "ベーコン", method: "grill", cook: 3 },
+  { id: "salmon", name: "鮭", method: "grill", cook: 5 },
+  { id: "tuna", name: "まぐろ", method: "grill", cook: 3 },
+  { id: "egg", name: "卵", method: "grill", cook: 2 },
+  { id: "bread", name: "食パン", method: "grill", cook: 2 },
+  { id: "butter", name: "バター", method: "grill", cook: 1 },
+  { id: "tomato", name: "トマト", method: "grill", cook: 2 },
+  { id: "lemon", name: "レモン", method: "grill", cook: 1 },
+  { id: "nori", name: "のり", method: "grill", cook: 1 },
+  { id: "salt", name: "塩", method: "grill", cook: 1 },
+  { id: "mayonnaise", name: "マヨネーズ", method: "grill", cook: 2 },
   // 茹でる
-  { name: "スパゲッティ", method: "boil", cook: 6 },
-  { name: "中華麺", method: "boil", cook: 5 },
-  { name: "豆腐", method: "boil", cook: 2 },
-  { name: "にんじん", method: "boil", cook: 3 },
-  { name: "ブロッコリー", method: "boil", cook: 2 },
-  { name: "ほうれん草", method: "boil", cook: 2 },
-  { name: "トウモロコシ", method: "boil", cook: 3 },
-  { name: "カレー", method: "boil", cook: 6 },
-  { name: "煮豚", method: "boil", cook: 6 },
-  { name: "煮卵", method: "boil", cook: 3 },
-  { name: "白米", method: "boil", cook: 5 },
-  { name: "焼売", method: "boil", cook: 4 },
+  { id: "pasta", name: "パスタ", method: "boil", cook: 6 },
+  { id: "chinese_noodles", name: "中華麺", method: "boil", cook: 5 },
+  { id: "rice", name: "米", method: "boil", cook: 5 },
+  { id: "tofu", name: "豆腐", method: "boil", cook: 2 },
+  { id: "carrot", name: "にんじん", method: "boil", cook: 3 },
+  { id: "cabbage", name: "キャベツ", method: "boil", cook: 2 },
+  { id: "lettuce", name: "レタス", method: "boil", cook: 1 },
+  { id: "cucumber", name: "きゅうり", method: "boil", cook: 1 },
+  { id: "negi", name: "長ねぎ", method: "boil", cook: 1 },
+  { id: "miso", name: "味噌", method: "boil", cook: 2 },
+  { id: "curry_roux", name: "カレールー", method: "boil", cook: 4 },
+  { id: "milk", name: "牛乳", method: "boil", cook: 2 },
+  { id: "soy_sauce", name: "しょうゆ", method: "boil", cook: 2 },
+  { id: "ketchup", name: "ケチャップ", method: "boil", cook: 2 },
+  { id: "strawberry", name: "いちご", method: "boil", cook: 1 },
   // 揚げる
-  { name: "フライドポテト", method: "fry", cook: 4 },
-  { name: "から揚げ肉", method: "fry", cook: 5 },
-  { name: "豚ロース", method: "fry", cook: 6 },
-  { name: "えび", method: "fry", cook: 3 },
-  { name: "かぼちゃ", method: "fry", cook: 3 },
-  { name: "白身魚", method: "fry", cook: 4 },
-  { name: "いか", method: "fry", cook: 3 },
-  { name: "コロッケ", method: "fry", cook: 4 },
-  { name: "春巻き", method: "fry", cook: 4 },
-  { name: "アスパラ", method: "fry", cook: 2 },
-  { name: "れんこん", method: "fry", cook: 3 },
-  { name: "チキンカツ", method: "fry", cook: 5 },
+  { id: "shrimp", name: "えび", method: "fry", cook: 3 },
+  { id: "flour", name: "小麦粉", method: "fry", cook: 2 },
+  { id: "breadcrumbs", name: "パン粉", method: "fry", cook: 2 },
+  { id: "potato", name: "じゃがいも", method: "fry", cook: 4 },
+  { id: "eggplant", name: "なす", method: "fry", cook: 3 },
+  { id: "garlic", name: "にんにく", method: "fry", cook: 2 },
+  { id: "sausage", name: "ソーセージ", method: "fry", cook: 3 },
+  { id: "onion", name: "玉ねぎ", method: "fry", cook: 3 },
+  { id: "green_pepper", name: "ピーマン", method: "fry", cook: 2 },
+  { id: "cheese", name: "チーズ", method: "fry", cook: 2 },
 ];
 
 const ing = (name: string): number => {
@@ -67,34 +68,35 @@ const ing = (name: string): number => {
 };
 
 export interface DishInfo {
+  id: string; // クライアントの3Dモデル(src/client/zukan.ts)の名前
   name: string;
   parts: number[]; // INGREDIENTS の番号
 }
 
-const dish = (name: string, ...parts: string[]): DishInfo => ({ name, parts: parts.map(ing) });
+const dish = (id: string, name: string, ...parts: string[]): DishInfo => ({ id, name, parts: parts.map(ing) });
 
-// 料理20種。どの食材もどれかの料理で使う。
+// 料理20種。どの食材もどれかの料理で使う。皿の上には、ほかにも飾りの具が載っているが、調理するのは主な食材(最大3つ)だけ。
 export const DISHES: DishInfo[] = [
-  dish("湯豆腐", "豆腐", "ほうれん草", "しいたけ"),
-  dish("温野菜サラダ", "ブロッコリー", "にんじん", "トウモロコシ"),
-  dish("焼きおにぎり", "ごはん", "鮭"),
-  dish("チーズポテト", "フライドポテト", "チーズ"),
-  dish("ホットサンド", "食パン", "ベーコン", "卵"),
-  dish("から揚げ定食", "から揚げ肉", "白米", "ピーマン"),
-  dish("点心盛り合わせ", "餃子", "焼売", "春巻き"),
-  dish("焼き鳥盛り合わせ", "焼き鳥串", "ピーマン", "玉ねぎ"),
-  dish("コロッケカレー", "カレー", "白米", "コロッケ"),
-  dish("ナポリタン", "スパゲッティ", "玉ねぎ", "ベーコン"),
-  dish("チャーハン", "ごはん", "卵", "豚バラ肉"),
-  dish("ハンバーグ定食", "合い挽き肉", "にんじん", "フライドポテト"),
-  dish("オムライス", "卵", "鶏もも肉", "ごはん"),
-  dish("カルボナーラ", "スパゲッティ", "ベーコン", "卵"),
-  dish("ラーメン", "中華麺", "煮豚", "煮卵"),
-  dish("とんかつ定食", "豚ロース", "白米", "ほうれん草"),
-  dish("天ぷら盛り合わせ", "えび", "かぼちゃ", "れんこん"),
-  dish("ステーキ", "牛ステーキ肉", "アスパラ", "フライドポテト"),
-  dish("フライ盛り合わせ", "白身魚", "いか", "チキンカツ"),
-  dish("焼きなすと鶏もも", "なす", "鶏もも肉", "ピーマン"),
+  dish("omurice", "オムライス", "卵", "米", "ケチャップ"),
+  dish("curry_rice", "カレーライス", "米", "カレールー", "じゃがいも"),
+  dish("hamburg_steak", "ハンバーグ", "合い挽き肉", "玉ねぎ", "パン粉"),
+  dish("hamburger", "ハンバーガー", "食パン", "合い挽き肉", "チーズ"),
+  dish("napolitan", "ナポリタン", "パスタ", "ソーセージ", "ピーマン"),
+  dish("ramen", "ラーメン", "中華麺", "豚肉", "しょうゆ"),
+  dish("sushi", "寿司", "米", "まぐろ", "のり"),
+  dish("onigiri", "おにぎり", "米", "鮭", "塩"),
+  dish("miso_soup", "味噌汁", "味噌", "豆腐", "長ねぎ"),
+  dish("tempura", "天ぷら", "えび", "なす", "小麦粉"),
+  dish("tonkatsu", "とんかつ", "豚肉", "パン粉", "キャベツ"),
+  dish("steak", "ステーキ", "牛肉", "にんにく", "バター"),
+  dish("salad", "サラダ", "レタス", "トマト", "きゅうり"),
+  dish("bacon_eggs", "ベーコンエッグ", "卵", "ベーコン", "食パン"),
+  dish("sandwich", "サンドイッチ", "食パン", "卵", "マヨネーズ"),
+  dish("pizza", "ピザ", "小麦粉", "チーズ", "ピーマン"),
+  dish("gyoza", "餃子", "小麦粉", "合い挽き肉", "長ねぎ"),
+  dish("grilled_salmon", "焼き鮭", "鮭", "塩", "レモン"),
+  dish("cream_stew", "クリームシチュー", "牛乳", "鶏肉", "にんじん"),
+  dish("pancakes", "パンケーキ", "小麦粉", "卵", "いちご"),
 ];
 
 export interface DrinkInfo {

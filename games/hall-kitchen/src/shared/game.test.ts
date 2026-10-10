@@ -76,9 +76,9 @@ test("メニューは料理20種・ドリンク20種・食材40種", () => {
   assert.ok(INGREDIENTS.every((d) => d.cook > 0));
 });
 
-test("食材は焼く16・茹でる12・揚げる12", () => {
+test("食材は焼く15・茹でる15・揚げる10", () => {
   const count = (m: Method) => INGREDIENTS.filter((d) => d.method === m).length;
-  assert.deepEqual([count("grill"), count("boil"), count("fry")], [16, 12, 12]);
+  assert.deepEqual([count("grill"), count("boil"), count("fry")], [15, 15, 10]);
 });
 
 test("料理は食材が1〜3個で、同じ食材を2回使わず、どの食材もどれかの料理で使う", () => {

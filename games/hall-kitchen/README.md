@@ -73,23 +73,22 @@ URL に `?debug` を付けると、ブラウザのコンソールから `__debug
 |---|---|---|---|
 | `hdri/warehouse.hdr` | 金属(ステンレス)に映り込む室内の景色 | [Poly Haven](https://polyhaven.com/hdris) の HDRI を、[pmndrs/assets](https://github.com/pmndrs/assets) が小さくしたもの | CC0 |
 | `models/glass-vase-flowers.glb` | テーブルの花瓶 | [Khronos glTF-Sample-Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) の Glass Vase with Flowers | CC0 |
-| `models/food/*.glb`(43個) | 食材・皿・ドリンクの3Dモデル | [Kenney](https://www.kenney.nl/) の Food Kit。[pmndrs/market-assets](https://github.com/pmndrs/market-assets) 経由で取得 | CC0 |
+| `models/food/*.glb`(12個) | ドリンクの3Dモデル | [Kenney](https://www.kenney.nl/) の Food Kit。[pmndrs/market-assets](https://github.com/pmndrs/market-assets) 経由で取得 | CC0 |
 
 使えなかった素材: Poly Haven・ambientCG・Quaternius・Kenney・Sketchfab は、この開発環境のネットワークから接続できなかった。
 人や食べ物の実物に近いモデル、ステンレスやタイルの写真の質感は、これらのサイトからでないと手に入りにくい。
 環境のネットワーク設定でこれらのドメインを許可すれば、取り込める。
 
-### 食材とドリンクのモデル(`models/food`)
-- 元のモデルは Draco 圧縮で、材質が「光に反応しない(unlit)」だった。取り込むときに [gltf-transform](https://gltf-transform.dev/) で圧縮を展開し、読み込み時に光と影に反応する材質へ置き換えている(`src/client/food.ts`)。
-- 食材40種のうち29種にモデルを割り当てた(`src/client/items.ts` の `ING_MODEL`)。モデルがない11種(スパゲッティ・中華麺・豆腐・白米・から揚げ肉・えび・いか・コロッケ・春巻き・れんこん・チキンカツ)は、コードで作った形のまま。
-- 生と調理後で別のモデルがあるもの(肉・卵・ベーコン)はそれを使い、ないものは色を寄せて焼き色・衣・煮汁の違いを出している。
-- Kenney のモデルは、角ばった低ポリゴンの見た目。写真のような質感ではない。
-- ドリンク20種は、すべてモデルを割り当てた(`DRINK_MODEL`)。お茶・ジュース・お酒の違いは、色寄せで出している。
-
-### 図鑑のモデル(`src/client/zukan.ts`)
-- 「食材と料理の3D図鑑」(コードだけで作る、細かい形)を取り込んだ。食材20種(合い挽き肉・牛・鶏もも・豚・卵・玉ねぎ・ピーマン・ごはん/白米・食パン・チーズ・ベーコン・鮭・なす・スパゲッティ・中華麺・豆腐・にんじん・えび)は、Kenney のモデルより優先して使う(`items.ts` の `ZUKAN_ING`)。調理後は材質の色を寄せて焼き色を出す。卵だけは、焼くと目玉焼きになるので、調理後は Kenney のモデルのまま。
-- 料理は、図鑑の皿ごとのモデルを使うもの12種(`ZUKAN_DISH`: 温野菜サラダ・焼きおにぎり・ホットサンド・点心盛り合わせ・コロッケカレー・ナポリタン・ハンバーグ定食・オムライス・ラーメン・とんかつ定食・天ぷら盛り合わせ・ステーキ)。残り8種は、これまで通り皿に食材を並べる。
+### 食材・料理のモデル(`src/client/zukan.ts`)
+- 食材40種と料理20種は、「食材と料理の3D図鑑」(コードだけで作る、細かい形)のモデルを使う。メニュー(`src/shared/menu.ts`)も、その図鑑の食材・料理そのまま。各食材・料理の `id` が、モデルの名前。
+- 料理は、皿の上に飾りの具も載っているが、調理するのは主な食材(最大3つ)だけ。ゲームの手持ち・盛り付け台の数(4・8)に収めるため、図鑑のレシピ(最大7つ)から主なものを選んだ。
+- 調理法は、生で食べるもの(トマト・レモン・調味料など)も含めて、焼く15・茹でる15・揚げる10に割り振った(ゲームの「全部の食材を調理場で仕上げる」仕組みに合わせた割り振りで、現実の調理法とは限らない)。
+- 調理後は、材質の色を寄せて焼き色などを出している(`items.ts` の `COOK_TINT`)。
 - 元のコードは three r128 向けで、型検査は外してある(ファイル先頭の `@ts-nocheck`)。
+
+### ドリンクのモデル(`models/food`)
+- Kenney の Food Kit(CC0)のうち、ドリンク用の12個だけを入れている。元のモデルは Draco 圧縮で、材質が「光に反応しない(unlit)」だった。取り込むときに [gltf-transform](https://gltf-transform.dev/) で圧縮を展開し、読み込み時に光と影に反応する材質へ置き換えている(`src/client/food.ts`)。
+- ドリンク20種は、すべてモデルを割り当てた(`DRINK_MODEL`)。お茶・ジュース・お酒の違いは、色寄せで出している。
 
 ## 動き・音・当たり判定
 - **歩ける場所**(`src/shared/layout.ts` の `OBSTACLES`、`src/shared/room.ts` の `step`): テーブル、ドリンクバー、調理場、冷蔵庫、シンク、作業台は通り抜けられない。ぶつかると壁に沿ってすべる。椅子はふさがない(お客さんに近づくため)。サーバーとクライアントが同じ関数で動かすので、予測がずれない。テストで、触れるもの全部に立って届くこと、通路がふさがっていないことを確認している。

@@ -1,4 +1,4 @@
-// 食材・ドリンクの3Dモデル(Kenney の Food Kit。CC0)。public/assets/models/food に置いてある。
+// ドリンクの3Dモデル(Kenney の Food Kit。CC0)。public/assets/models/food に置いてある。
 // モデルの元は Draco 圧縮と「光に反応しない(unlit)」材質だったので、
 //  - 圧縮は取り込むときに展開して(gltf-transform)、
 //  - 材質は読み込み時に、光と影に反応する材質へ置き換える。
@@ -9,10 +9,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { loadAsset } from "./assets";
 
 export const FOOD_MODELS = [
-  "meat-patty", "meat-raw", "meat-cooked", "meat-ribs", "turkey", "bacon-raw", "bacon", "egg", "egg-cooked", "egg-half",
-  "onion", "onion-half", "paprika", "mushroom", "rice-ball", "bread", "cheese-cut", "skewer", "fish", "eggplant", "dim-sum",
-  "carrot", "broccoli", "cabbage", "leek", "corn", "pumpkin-basic", "fries", "pot-stew", "plate", "frying-pan",
-  // ドリンク
   "glass", "glass-wine", "soda-glass", "soda", "frappe", "mug-1", "cup", "cup-tea", "cup-thea", "egg-cup", "soda-bottle", "bottle",
 ] as const;
 export type FoodModel = (typeof FOOD_MODELS)[number];
@@ -44,7 +40,7 @@ export async function preloadFood(): Promise<void> {
         });
         templates.set(name, gltf.scene);
       } catch (e) {
-        console.warn(`食材のモデルを読み込めませんでした: ${name}`, e);
+        console.warn(`モデルを読み込めませんでした: ${name}`, e);
       }
     }),
   );
