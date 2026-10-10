@@ -435,7 +435,8 @@ export class Game {
     const names: string[] = [];
     for (const p of t.parts) {
       if (p.st !== "need" || names.length >= room) continue;
-      p.st = "raw";
+      // 生で使うもの(そのまま)は、調理せずにそのまま盛り付けられる
+      p.st = methodOfIngredient(p.ing) === "none" ? "cooked" : "raw";
       names.push(ingredientName(p.ing));
     }
     if (!t.parts.some((p) => p.st === "need")) this.selFood = null;

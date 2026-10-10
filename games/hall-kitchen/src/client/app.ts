@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ROOM_CODE, type ClientMessage, type ServerMessage } from "../shared/protocol";
 import { CONFIG, partIndex, partTicket, type GameSnapshot, type PartState, type TicketSnapshot } from "../shared/game";
-import { METHOD_NAME, dishName, drinkName, ingredientName, methodOfIngredient, type Method } from "../shared/menu";
+import { METHOD_NAME, PREP_NAME, dishName, drinkName, ingredientName, methodOfIngredient, type Method } from "../shared/menu";
 import { STOVES, nearestTarget, seatLabel } from "../shared/layout";
 import { step, type PlayerSnapshot, type Role } from "../shared/room";
 import { dishColorCss, drinkColorCss } from "./items";
@@ -241,7 +241,7 @@ function heldParts(g: GameSnapshot): { t: TicketSnapshot; ing: number; st: PartS
 }
 
 const STATE_LABEL: Record<PartState, string> = { need: "未", raw: "持", cooking: "調理中", ready: "できた", cooked: "調理済", plated: "済" };
-const methodTag = (ing: number) => `<i class="m ${methodOfIngredient(ing)}">${METHOD_NAME[methodOfIngredient(ing)]}</i>`;
+const methodTag = (ing: number) => `<i class="m ${methodOfIngredient(ing)}">${PREP_NAME[methodOfIngredient(ing)]}</i>`;
 
 function onGame(g: GameSnapshot) {
   const prev = game;

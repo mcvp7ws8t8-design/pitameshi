@@ -4,6 +4,11 @@ import { CONFIG, Game, partIndex, partTicket, spawnInterval } from "./game";
 import { BARS, FRIDGE, PASS, SEATS, STOVES, TABLES, seatLabel } from "./layout";
 import { DISHES, DRINKS, INGREDIENTS, methodOfIngredient, type Method } from "./menu";
 
+/** 調理場で調理する食材か(生で使う「そのまま」の食材は調理しない) */
+const cookable = (ing: number): boolean => methodOfIngredient(ing) !== "none";
+/** 調理場の調理法(調理しない食材では使わない) */
+const methodOf = (ing: number): Method => methodOfIngredient(ing) as Method;
+
 function started(seed = 1): Game {
   const g = new Game(seed);
   g.update(true);
@@ -54,8 +59,8 @@ function makeDishFor(g: Game, ticketId: number): void {
   assert.match(atFridge(g), /取った/);
   const t = g.snapshot().tickets.find((x) => x.id === ticketId)!;
   const stations: number[] = [];
-  for (const part of t.parts!) {
-    const i = freeStation(g, methodOfIngredient(part.ing));
+  for (const part of t.parts!.filter((x) => cookable(x.ing))) {
+    const i = freeStation(g, methodOf(part.ing));
     assert.ok(i >= 0, "空いている調理場がある");
     assert.match(atStove(g, i), /始めた/);
     stations.push(i);
@@ -73,12 +78,12 @@ test("メニューは料理20種・ドリンク20種・食材40種", () => {
   assert.equal(new Set(DRINKS.map((d) => d.name)).size, 20);
   assert.equal(new Set(INGREDIENTS.map((d) => d.name)).size, 40);
   assert.ok(DRINKS.every((d) => d.make > 0 && d.relief > 0 && d.relief <= 1));
-  assert.ok(INGREDIENTS.every((d) => d.cook > 0));
+  assert.ok(INGREDIENTS.every((d) => (d.method === "none" ? d.cook === 0 : d.cook > 0)));
 });
 
-test("食材は焼く15・茹でる15・揚げる10", () => {
-  const count = (m: Method) => INGREDIENTS.filter((d) => d.method === m).length;
-  assert.deepEqual([count("grill"), count("boil"), count("fry")], [15, 15, 10]);
+test("食材は焼く13・茹でる10・揚げる5・そのまま12", () => {
+  const count = (m: string) => INGREDIENTS.filter((d) => d.method === m).length;
+  assert.deepEqual([count("grill"), count("boil"), count("fry"), count("none")], [13, 10, 5, 12]);
 });
 
 test("料理は食材が1〜3個で、同じ食材を2回使わず、どの食材もどれかの料理で使う", () => {
@@ -175,7 +180,8 @@ test("冷蔵庫: 注文の食材を取る", () => {
   const t = tickets(g, "food")[0]!;
   assert.ok(t.parts!.every((p) => p.st === "need"));
   assert.match(atFridge(g), /取った/);
-  assert.ok(g.snapshot().tickets.find((x) => x.id === t.id)!.parts!.every((p) => p.st === "raw"));
+  // 調理する食材は生で持ち、そのまま使う食材は調理済みとして持つ
+  assert.ok(g.snapshot().tickets.find((x) => x.id === t.id)!.parts!.every((p) => p.st === (cookable(p.ing) ? "raw" : "cooked")));
   assert.equal(atFridge(g), "取る食材がありません");
 });
 
@@ -185,9 +191,9 @@ test("冷蔵庫: 手に持てるのは4つまで。入りきらない分は取�
     run(g, 8);
     orderAll(g);
   }
-  const raw = () => g.snapshot().tickets.flatMap((x) => x.parts ?? []).filter((p) => p.st === "raw").length;
+  const held = () => g.snapshot().tickets.flatMap((x) => x.parts ?? []).filter((p) => p.st === "raw" || p.st === "cooked").length;
   for (let i = 0; i < 6; i++) atFridge(g);
-  assert.equal(raw(), CONFIG.holdKitchen);
+  assert.equal(held(), CONFIG.holdKitchen);
 });
 
 test("冷蔵庫: 手がいっぱいなら取れない", () => {
@@ -205,16 +211,33 @@ test("調理場: 合う調理法の食材だけ入れられる", () => {
   firstOrder(g);
   const t = tickets(g, "food")[0]!;
   atFridge(g);
-  const first = t.parts![0]!.ing;
-  const wrong = STOVES.findIndex((s) => s.kind !== methodOfIngredient(first));
+  const cook = t.parts!.filter((p) => cookable(p.ing));
+  if (cook.length === 0) return; // 調理する食材がない料理(サラダ)は、次のテストで確かめる
+  const first = cook[0]!.ing;
   // 持っている食材に、その調理場で作れるものがなければ作れない
-  const methods = new Set(t.parts!.map((p) => methodOfIngredient(p.ing)));
+  const methods = new Set(cook.map((p) => methodOf(p.ing)));
   const none = STOVES.findIndex((s) => !methods.has(s.kind));
   if (none >= 0) assert.match(atStove(g, none), /作れる食材がありません/);
-  void wrong;
-  const ok = freeStation(g, methodOfIngredient(first));
+  const ok = freeStation(g, methodOf(first));
   assert.match(atStove(g, ok), /始めた/);
   assert.match(atStove(g, ok), /最中です/);
+});
+
+test("調理しない食材だけの料理(サラダ)は、冷蔵庫で取ったらそのまま盛り付けられる", () => {
+  const salad = DISHES.findIndex((d) => d.name === "サラダ");
+  assert.ok(DISHES[salad]!.parts.every((p) => !cookable(p)));
+  let found = false;
+  for (let seed = 1; seed < 400 && !found; seed++) {
+    const g = started(seed);
+    firstOrder(g);
+    const t = tickets(g, "food")[0]!;
+    if (t.item !== salad) continue;
+    found = true;
+    assert.match(atFridge(g), /取った/);
+    assert.match(kitchenPass(g), /完成/);
+    assert.equal(tickets(g, "food")[0]!.status, "pass");
+  }
+  assert.ok(found, "サラダを注文されるゲームが見つかる");
 });
 
 test("調理場: 食材を持っていないと何もできない", () => {
@@ -244,13 +267,14 @@ test("盛り付け: 食材が全部そろうまで完成しない", () => {
   const t = tickets(g, "food")[0]!;
   atFridge(g);
   // 1つだけ調理して盛り付ける
-  const part = t.parts![0]!;
-  const i = freeStation(g, methodOfIngredient(part.ing));
+  const part = t.parts!.find((p) => cookable(p.ing));
+  if (!part) return;
+  const i = freeStation(g, methodOf(part.ing));
   atStove(g, i);
   run(g, 8);
   atStove(g, i);
   const msg = kitchenPass(g);
-  if (t.parts!.length > 1) {
+  if (t.parts!.some((p) => p !== part && cookable(p.ing))) {
     assert.match(msg, /あと\d+つ/);
     assert.equal(tickets(g, "food")[0]!.status, "new");
   }
@@ -266,8 +290,11 @@ test("お客さんが怒って帰ると、食材も調理中のものも消え�
   firstOrder(g);
   atFridge(g);
   const t = tickets(g, "food")[0]!;
-  atStove(g, freeStation(g, methodOfIngredient(t.parts![0]!.ing)));
-  assert.ok(g.stoves.some((x) => x !== null));
+  const cook = t.parts!.find((p) => cookable(p.ing));
+  if (cook) {
+    atStove(g, freeStation(g, methodOf(cook.ing)));
+    assert.ok(g.stoves.some((x) => x !== null));
+  }
   run(g, CONFIG.foodPatience + 1);
   assert.equal(g.stoves.every((x) => x === null), true);
   assert.equal(tickets(g, "food").length, 0);
